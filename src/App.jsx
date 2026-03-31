@@ -66,7 +66,7 @@ const pillConfigs = {
   water: { options: ["great", "okay", "low", "terrible"], colors: { great: theme.green, okay: theme.blue, low: theme.gold, terrible: theme.accent } },
   stress: { options: ["low", "medium", "high", "overwhelmed"], colors: { low: theme.green, medium: theme.blue, high: theme.gold, overwhelmed: theme.accent } },
   window: { options: ["yes", "mostly", "stretched it", "no"], colors: { yes: theme.green, mostly: theme.blue, "stretched it": theme.gold, no: theme.accent } },
-  workout: { options: ["Push", "Pull", "Legs", "Run/HIIT", "Rest", "Other"], colors: {} },
+  workout: { options: ["Push", "Pull", "Legs", "Run/HIIT", "Walk", "Rest", "Other"], colors: {} },
 };
 const pillColor = (val, type) => pillConfigs[type]?.colors?.[val] || theme.textMuted;
 
@@ -275,7 +275,7 @@ const InsightsView = ({ entries }) => {
 
   const stepsData = recent.filter((e) => e.steps).map((e) => ({ date: shortDate(e.date), steps: parseInt(e.steps) }));
   const avgSteps = stepsData.length > 0 ? Math.round(stepsData.reduce((s, d) => s + d.steps, 0) / stepsData.length) : 0;
-  const daysAbove8k = stepsData.filter((d) => d.steps >= 8000).length;
+  const daysAbove7k = stepsData.filter((d) => d.steps >= 7000).length;
 
   const windowData = recent.filter((e) => e.first_food && e.last_food).map((e) => {
     const mins = calcWindowMins(e.first_food, e.last_food);
@@ -357,13 +357,13 @@ const InsightsView = ({ entries }) => {
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
               <Tooltip content={<TT formatter={(p) => `${Number(p.value).toLocaleString()} steps`} />} />
-              <ReferenceLine y={8000} stroke={theme.gold} strokeDasharray="4 4" strokeOpacity={0.5} />
-              <Bar dataKey="steps" radius={[4, 4, 0, 0]}>{stepsData.map((d, i) => <Cell key={i} fill={d.steps >= 8000 ? theme.green : theme.accent + "88"} />)}</Bar>
+              <ReferenceLine y={7000} stroke={theme.gold} strokeDasharray="4 4" strokeOpacity={0.5} />
+              <Bar dataKey="steps" radius={[4, 4, 0, 0]}>{stepsData.map((d, i) => <Cell key={i} fill={d.steps >= 7000 ? theme.green : theme.accent + "88"} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.textDim, marginTop: 4, fontFamily: font }}>
             <span>avg: {avgSteps.toLocaleString()}/day</span>
-            <span>{daysAbove8k}/{stepsData.length} days at 8K+</span>
+            <span>{daysAbove7k}/{stepsData.length} days at 7K+</span>
           </div>
         </Card>
       )}
@@ -442,11 +442,11 @@ const InsightsView = ({ entries }) => {
           </div>
         ))}
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: theme.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, fontFamily: font }}>Steps (8K+)</div>
+          <div style={{ fontSize: 11, color: theme.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, fontFamily: font }}>Steps (7K+)</div>
           <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
             {sorted.slice(-21).map((e) => {
               const steps = e.steps ? parseInt(e.steps) : 0;
-              const ok = steps >= 8000;
+              const ok = steps >= 7000;
               const has = !!e.steps;
               return (
                 <div key={e.date} title={`${formatDate(e.date)}: ${has ? steps.toLocaleString() : "no data"}`} style={{
@@ -506,8 +506,8 @@ function generateReport(entries) {
   if (lw.length) r += `- Low water intake on ${lw.length}/${recent.length} days\n`;
   const le = recent.filter((e) => e.energy === "low" || e.energy === "crashed");
   if (le.length) r += `- Low energy on ${le.length}/${recent.length} days\n`;
-  const sb = recent.filter((e) => e.steps && parseInt(e.steps) < 8000);
-  if (sb.length) r += `- Steps below 8K on ${sb.length}/${recent.length} days\n`;
+  const sb = recent.filter((e) => e.steps && parseInt(e.steps) < 7000);
+  if (sb.length) r += `- Steps below 7K on ${sb.length}/${recent.length} days\n`;
   const td = recent.filter((e) => e.treats && e.treats.trim());
   if (td.length) r += `- Treats logged on ${td.length}/${recent.length} days\n`;
   const lngW = recent.filter((e) => { const m = calcWindowMins(e.first_food, e.last_food); return m !== null && m > 480; });
