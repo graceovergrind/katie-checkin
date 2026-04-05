@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Area, AreaChart } from "recharts";
 import { storage } from "./supabase.js";
+import WorkoutCoach from "./WorkoutCoach.jsx";
 
 const PIN = import.meta.env.VITE_APP_PIN || "1234";
 
@@ -613,7 +614,11 @@ export default function App() {
     </div>
   );
 
-  const navItems = [["form", "Today"], ["insights", "Insights"], ["history", `History${entries.length ? ` (${entries.length})` : ""}`], ["export", "Coach Me"]];
+  const navItems = [["form", "Today"], ["workout", "Workout"], ["insights", "Insights"], ["history", `History${entries.length ? ` (${entries.length})` : ""}`], ["export", "Coach Me"]];
+
+  if (view === "workout") {
+    return <WorkoutCoach onBack={() => setView("form")} />;
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: theme.bg, fontFamily: font }}>
