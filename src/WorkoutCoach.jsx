@@ -238,8 +238,11 @@ const WeightInput = ({ exerciseKey, log, onLog, accentColor, unit }) => {
 
   const handleSave = async () => {
     if (!weight || !feedback) return;
-    const entry = { date: new Date().toISOString().split("T")[0], weight: parseFloat(weight), feedback };
-    const updated = { ...log, [exerciseKey]: [...history, entry] };
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const entry = { date, weight: parseFloat(weight), feedback };
+    const newHistory = [...history.filter(e => e.date !== date), entry];
+    const updated = { ...log, [exerciseKey]: newHistory };
     await saveLog(updated);
     onLog(updated);
     setSaved(true);
@@ -388,10 +391,14 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
                 cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                 transition: "all 0.2s"
               }}
+              aria-label="Toggle weight panel"
+              aria-expanded={showWeight}
             >{"\u2696"}</button>
           )}
           <button
             onClick={() => { setShowCoaching(!showCoaching); if (!showCoaching) setShowWeight(false); }}
+            aria-label="Toggle coaching tips"
+            aria-expanded={showCoaching}
             style={{
               background: showCoaching ? accentColor : "rgba(255,255,255,0.08)",
               border: "none", color: showCoaching ? "#fff" : "#aaa",
@@ -492,11 +499,25 @@ export default function WorkoutCoach({ onBack }) {
   const [completed, setCompleted] = useState(false);
   const [log, setLog] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  useEffect(() => {
-    loadLog().then(l => { setLog(l); setLoading(false); });
+  const doLoadLog = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const l = await loadLog();
+      setLog(l);
+    } catch (e) {
+      setLoadError(e.message || "Failed to load workout log");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    doLoadLog();
+  }, [doLoadLog]);
 
   const resetWorkout = useCallback(() => {
     setPhase("warmup"); setCircuitIdx(0); setRoundNum(1);
@@ -536,6 +557,21 @@ export default function WorkoutCoach({ onBack }) {
     return (
       <div style={{ minHeight: "100vh", background: "#0D0D0D", display: "flex", alignItems: "center", justifyContent: "center", ...cssVars }}>
         <div style={{ color: "#555", fontFamily: "var(--body)" }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0D0D0D", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, ...cssVars }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>{"\u26a0\ufe0f"}</div>
+          <div style={{ color: "#E85D4A", fontFamily: "var(--body)", fontSize: 15, marginBottom: 16 }}>{loadError}</div>
+          <button onClick={doLoadLog} style={{
+            padding: "12px 24px", borderRadius: 10, border: "none",
+            background: "#E85D4A", color: "white", fontFamily: "var(--body)", fontSize: 14, cursor: "pointer",
+          }}>Retry</button>
+        </div>
       </div>
     );
   }
@@ -680,7 +716,7 @@ export default function WorkoutCoach({ onBack }) {
     exercises = workout.cooldown.exercises;
   }
 
-  const totalPhases = 2 + workout.circuits.length + 1 + 1;
+  const totalPhases = 3 + workout.circuits.length;
   let currentPhase = phase === "warmup" ? 0
     : phase === "circuits" ? 1 + circuitIdx
     : phase === "abs" ? 1 + workout.circuits.length

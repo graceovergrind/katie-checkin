@@ -4,7 +4,7 @@ export async function loadLog() {
   const { data, error } = await supabase
     .from("workout_log")
     .select("*")
-    .order("created_at", { ascending: true });
+    .order("date", { ascending: true });
   if (error) throw error;
   const log = {};
   for (const row of data || []) {
