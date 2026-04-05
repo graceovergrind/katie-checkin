@@ -47,3 +47,21 @@ CREATE TRIGGER set_updated_at
   BEFORE UPDATE ON checkin_entries
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at();
+
+-- Workout weight log table (for the Workout Coach feature)
+CREATE TABLE workout_log (
+  id BIGSERIAL PRIMARY KEY,
+  exercise_key TEXT NOT NULL,        -- e.g. "push::incline-dumbbell-press"
+  date DATE NOT NULL,
+  weight NUMERIC NOT NULL,           -- weight used in lbs
+  feedback TEXT NOT NULL,            -- "light", "good", or "heavy"
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(exercise_key, date)
+);
+
+ALTER TABLE workout_log ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all operations" ON workout_log
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
