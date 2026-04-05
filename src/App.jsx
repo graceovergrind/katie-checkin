@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Area, AreaChart } from "recharts";
 import { storage } from "./supabase.js";
-import { loadLog } from "./workoutStorage.js";
+import { loadLog, loadRunLog } from "./workoutStorage.js";
 import WorkoutCoach from "./WorkoutCoach.jsx";
 
 const PIN = import.meta.env.VITE_APP_PIN || "1234";
@@ -269,7 +269,13 @@ const dayColor = (key) => {
   return { push: "#E85D4A", pull: "#3B82C4", legs: "#7C3AED" }[day] || theme.textMuted;
 };
 
-const InsightsView = ({ entries, workoutLog = {} }) => {
+const formatRunPace = (seconds) => {
+  const min = Math.floor(seconds / 60);
+  const sec = Math.round(seconds % 60);
+  return `${min}:${sec.toString().padStart(2, "0")}`;
+};
+
+const InsightsView = ({ entries, workoutLog = {}, runLog = [] }) => {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
   const recent = sorted.slice(-14);
   const recent7 = sorted.slice(-7);
@@ -480,6 +486,109 @@ const InsightsView = ({ entries, workoutLog = {} }) => {
         </div>
       </Card>
 
+      {/* --- Running Insights --- */}
+      {runLog.length > 0 && (() => {
+        const sortedRuns = [...runLog].sort((a, b) => a.date.localeCompare(b.date));
+        const longestRun = Math.max(...sortedRuns.map(r => Number(r.distance)));
+        const bestPaceRun = sortedRuns.filter(r => r.distance > 0).reduce((best, r) => {
+          const pace = r.duration / r.distance;
+          return pace < best.pace ? { pace, run: r } : best;
+        }, { pace: Infinity, run: null });
+        const totalMiles = sortedRuns.reduce((s, r) => s + Number(r.distance), 0);
+        const reached5k = longestRun >= 3.1;
+        const reached10minPace = bestPaceRun.pace <= 600;
+        const fiveKProgress = Math.min(100, Math.round((longestRun / 3.1) * 100));
+        const paceProgress = bestPaceRun.pace < Infinity ? Math.min(100, Math.round((600 / bestPaceRun.pace) * 100)) : 0;
+
+        const distanceData = sortedRuns.map(r => ({ date: shortDate(r.date), distance: Number(r.distance) }));
+        const paceData = sortedRuns.filter(r => r.distance > 0).map(r => ({
+          date: shortDate(r.date),
+          pace: +(r.duration / r.distance / 60).toFixed(2),
+        }));
+
+        return (
+          <>
+            <Card style={{ background: `linear-gradient(135deg, ${theme.surface}, #1a2e1a)` }}>
+              <CardTitle color="#22C55E">Running Goals</CardTitle>
+              <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 16 }}>
+                <StatBox label="Runs" value={sortedRuns.length} sub="total" color={theme.blue} />
+                <StatBox label="Total" value={totalMiles.toFixed(1)} sub="miles" color={theme.green} />
+                <StatBox label="Longest" value={longestRun.toFixed(2)} sub="miles" color={theme.gold} />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.textMuted, fontFamily: font, marginBottom: 4 }}>
+                  <span>5K Distance (3.1 mi)</span>
+                  <span style={{ color: reached5k ? theme.green : theme.textMuted }}>{reached5k ? "Reached!" : `${longestRun.toFixed(2)} / 3.1 mi`}</span>
+                </div>
+                <div style={{ height: 8, background: theme.bg, borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ width: `${fiveKProgress}%`, height: "100%", background: reached5k ? theme.green : `linear-gradient(90deg, #22C55E, #F59E0B)`, borderRadius: 4, transition: "width 0.5s ease" }} />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.textMuted, fontFamily: font, marginBottom: 4 }}>
+                  <span>10:00/mi Pace</span>
+                  <span style={{ color: reached10minPace ? theme.green : theme.textMuted }}>
+                    {reached10minPace ? "Reached!" : bestPaceRun.pace < Infinity ? `${formatRunPace(bestPaceRun.pace)} best` : "No data"}
+                  </span>
+                </div>
+                <div style={{ height: 8, background: theme.bg, borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ width: `${paceProgress}%`, height: "100%", background: reached10minPace ? theme.green : `linear-gradient(90deg, #F59E0B, #22C55E)`, borderRadius: 4, transition: "width 0.5s ease" }} />
+                </div>
+              </div>
+            </Card>
+
+            {distanceData.length >= 2 && (
+              <Card>
+                <CardTitle color={theme.green}>Run Distance</CardTitle>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={distanceData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} unit=" mi" />
+                    <Tooltip content={<TT formatter={(p) => `${p.value} miles`} />} />
+                    <ReferenceLine y={3.1} stroke={theme.green} strokeDasharray="4 4" strokeOpacity={0.5} />
+                    <Bar dataKey="distance" radius={[4, 4, 0, 0]}>
+                      {distanceData.map((d, i) => <Cell key={i} fill={d.distance >= 3.1 ? theme.green : theme.blue} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div style={{ textAlign: "right", fontSize: 10, color: theme.textDim, marginTop: 4 }}>— 5K: 3.1 mi</div>
+              </Card>
+            )}
+
+            {paceData.length >= 2 && (
+              <Card>
+                <CardTitle color={theme.gold}>Pace Trend</CardTitle>
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={paceData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
+                    <YAxis domain={["dataMin - 0.5", "dataMax + 0.5"]} tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} unit=" min" reversed />
+                    <Tooltip content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const paceMin = payload[0].value;
+                      const totalSec = Math.round(paceMin * 60);
+                      return (
+                        <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: 8, padding: "8px 12px", fontFamily: font, fontSize: 12 }}>
+                          <div style={{ color: theme.textMuted, marginBottom: 4 }}>{label}</div>
+                          <div style={{ color: totalSec <= 600 ? theme.green : theme.text }}>{formatRunPace(totalSec)} /mi</div>
+                        </div>
+                      );
+                    }} />
+                    <ReferenceLine y={10} stroke={theme.green} strokeDasharray="4 4" strokeOpacity={0.5} />
+                    <Line type="monotone" dataKey="pace" stroke={theme.gold} strokeWidth={2.5} dot={{ r: 3, fill: theme.gold }} />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: theme.textDim, marginTop: 4, fontFamily: font }}>
+                  <span>lower = faster</span>
+                  <span style={{ color: theme.green }}>— 10:00/mi goal</span>
+                </div>
+              </Card>
+            )}
+          </>
+        );
+      })()}
+
       {/* --- Lifting Insights --- */}
       {Object.keys(workoutLog).length > 0 && (() => {
         const exerciseKeys = Object.keys(workoutLog).filter((k) => workoutLog[k].length > 0);
@@ -689,6 +798,7 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(null);
   const [workoutLog, setWorkoutLog] = useState({});
+  const [runLog, setRunLog] = useState([]);
 
   const loadEntries = useCallback(async () => {
     try {
@@ -709,6 +819,7 @@ export default function App() {
     if (authed) {
       loadEntries();
       loadLog().then(setWorkoutLog).catch((e) => console.error("Workout log load error:", e));
+      loadRunLog().then(setRunLog).catch((e) => console.error("Run log load error:", e));
     }
     else setLoading(false);
   }, [authed, loadEntries]);
@@ -848,7 +959,7 @@ export default function App() {
           </div>
         )}
 
-        {view === "insights" && <InsightsView entries={entries} workoutLog={workoutLog} />}
+        {view === "insights" && <InsightsView entries={entries} workoutLog={workoutLog} runLog={runLog} />}
 
         {view === "history" && (
           <div>

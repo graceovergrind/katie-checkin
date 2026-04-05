@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { loadLog, saveLog } from "./workoutStorage.js";
+import { loadLog, saveLog, loadRunLog, saveRun } from "./workoutStorage.js";
 
 function getExerciseKey(dayKey, exerciseName) {
   return `${dayKey}::${exerciseName.toLowerCase().replace(/\s+/g, "-")}`;
@@ -432,6 +432,218 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
   );
 };
 
+const formatPace = (seconds) => {
+  const min = Math.floor(seconds / 60);
+  const sec = Math.round(seconds % 60);
+  return `${min}:${sec.toString().padStart(2, "0")}`;
+};
+
+const formatDuration = (totalSec) => {
+  const hrs = Math.floor(totalSec / 3600);
+  const min = Math.floor((totalSec % 3600) / 60);
+  const sec = totalSec % 60;
+  if (hrs > 0) return `${hrs}:${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+  return `${min}:${sec.toString().padStart(2, "0")}`;
+};
+
+const RunLogger = ({ runs, onSave }) => {
+  const [distance, setDistance] = useState("");
+  const [minutes, setMinutes] = useState("");
+  const [seconds, setSeconds] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayRun = runs.find(r => r.date === todayStr);
+
+  const totalSeconds = (parseInt(minutes) || 0) * 60 + (parseInt(seconds) || 0);
+  const dist = parseFloat(distance) || 0;
+  const pace = dist > 0 && totalSeconds > 0 ? totalSeconds / dist : 0;
+
+  const handleSave = async () => {
+    if (!dist || !totalSeconds) return;
+    await onSave({ date: todayStr, distance: dist, duration: totalSeconds, notes });
+    setSaved(true);
+  };
+
+  if (saved || todayRun) {
+    const run = todayRun || { distance: dist, duration: totalSeconds, notes };
+    const p = run.distance > 0 ? run.duration / run.distance : 0;
+    return (
+      <div style={{ padding: "20px", background: "rgba(34,197,94,0.06)", borderRadius: 16, margin: "0 20px" }}>
+        <div style={{ textAlign: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 13, color: "#22C55E", fontFamily: "var(--mono)", letterSpacing: 2, textTransform: "uppercase" }}>Today's Run Logged</div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-around" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "#fff", fontFamily: "var(--mono)" }}>{run.distance}</div>
+            <div style={{ fontSize: 11, color: "#666", fontFamily: "var(--mono)" }}>miles</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "#fff", fontFamily: "var(--mono)" }}>{formatDuration(run.duration)}</div>
+            <div style={{ fontSize: 11, color: "#666", fontFamily: "var(--mono)" }}>time</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: p <= 600 ? "#22C55E" : "#fff", fontFamily: "var(--mono)" }}>{formatPace(p)}</div>
+            <div style={{ fontSize: 11, color: "#666", fontFamily: "var(--mono)" }}>min/mi</div>
+          </div>
+        </div>
+        {run.notes && <div style={{ marginTop: 12, fontSize: 13, color: "#888", fontFamily: "var(--body)", textAlign: "center" }}>{run.notes}</div>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "0 20px" }}>
+      <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 16, padding: "20px", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: "var(--body)", marginBottom: 16 }}>Log Today's Run</div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: "#666", fontFamily: "var(--mono)", marginBottom: 6 }}>Distance (miles)</div>
+          <input
+            type="number" inputMode="decimal" step="0.01" value={distance}
+            onChange={e => setDistance(e.target.value)} placeholder="e.g. 1.5"
+            style={{
+              width: "100%", padding: "12px", background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+              color: "#fff", fontSize: 18, fontFamily: "var(--mono)", outline: "none", boxSizing: "border-box"
+            }}
+          />
+          {dist > 0 && dist < 3.1 && (
+            <div style={{ fontSize: 11, color: "#F59E0B", fontFamily: "var(--mono)", marginTop: 4 }}>
+              {(3.1 - dist).toFixed(2)} miles to 5K!
+            </div>
+          )}
+          {dist >= 3.1 && <div style={{ fontSize: 11, color: "#22C55E", fontFamily: "var(--mono)", marginTop: 4 }}>5K distance reached!</div>}
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: "#666", fontFamily: "var(--mono)", marginBottom: 6 }}>Time</div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="number" inputMode="numeric" value={minutes}
+              onChange={e => setMinutes(e.target.value)} placeholder="min"
+              style={{
+                flex: 1, padding: "12px", background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+                color: "#fff", fontSize: 18, fontFamily: "var(--mono)", outline: "none", textAlign: "center"
+              }}
+            />
+            <span style={{ color: "#555", fontSize: 18, fontFamily: "var(--mono)" }}>:</span>
+            <input
+              type="number" inputMode="numeric" value={seconds}
+              onChange={e => setSeconds(e.target.value)} placeholder="sec" min="0" max="59"
+              style={{
+                flex: 1, padding: "12px", background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+                color: "#fff", fontSize: 18, fontFamily: "var(--mono)", outline: "none", textAlign: "center"
+              }}
+            />
+          </div>
+        </div>
+
+        {pace > 0 && (
+          <div style={{
+            padding: "12px", background: pace <= 600 ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
+            borderRadius: 8, marginBottom: 16, textAlign: "center"
+          }}>
+            <span style={{ fontSize: 13, color: "#888", fontFamily: "var(--mono)" }}>Pace: </span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: pace <= 600 ? "#22C55E" : "#fff", fontFamily: "var(--mono)" }}>{formatPace(pace)}</span>
+            <span style={{ fontSize: 13, color: "#888", fontFamily: "var(--mono)" }}> /mi</span>
+            {pace > 600 && (
+              <div style={{ fontSize: 11, color: "#F59E0B", fontFamily: "var(--mono)", marginTop: 4 }}>
+                {formatPace(pace - 600)} to cut to reach 10:00/mi goal
+              </div>
+            )}
+            {pace <= 600 && <div style={{ fontSize: 11, color: "#22C55E", fontFamily: "var(--mono)", marginTop: 4 }}>Under 10:00/mi — goal pace!</div>}
+          </div>
+        )}
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: "#666", fontFamily: "var(--mono)", marginBottom: 6 }}>Notes (optional)</div>
+          <input
+            type="text" value={notes} onChange={e => setNotes(e.target.value)}
+            placeholder="e.g. felt strong, knee a little stiff"
+            style={{
+              width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+              color: "#fff", fontSize: 13, fontFamily: "var(--body)", outline: "none", boxSizing: "border-box"
+            }}
+          />
+        </div>
+
+        <button
+          onClick={handleSave} disabled={!dist || !totalSeconds}
+          style={{
+            width: "100%", padding: "14px", borderRadius: 10, border: "none",
+            background: dist && totalSeconds ? "#22C55E" : "rgba(255,255,255,0.05)",
+            color: dist && totalSeconds ? "#fff" : "#444",
+            fontSize: 15, fontWeight: 600, cursor: dist && totalSeconds ? "pointer" : "default",
+            fontFamily: "var(--body)", transition: "all 0.15s"
+          }}
+        >Log Run</button>
+      </div>
+    </div>
+  );
+};
+
+const RunHistoryView = ({ runs }) => {
+  if (runs.length === 0) {
+    return (
+      <div style={{ padding: "40px 20px", textAlign: "center", color: "#555", fontSize: 14, fontFamily: "var(--body)" }}>
+        No runs logged yet. Tap "Log a Run" to start tracking.
+      </div>
+    );
+  }
+
+  const sorted = [...runs].sort((a, b) => b.date.localeCompare(a.date));
+  const bestPace = Math.min(...runs.filter(r => r.distance > 0).map(r => r.duration / r.distance));
+  const longestRun = Math.max(...runs.map(r => r.distance));
+  const totalMiles = runs.reduce((s, r) => s + Number(r.distance), 0);
+
+  return (
+    <div style={{ padding: "0 20px 40px" }}>
+      <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 20, padding: "16px", background: "rgba(255,255,255,0.03)", borderRadius: 12 }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#22C55E", fontFamily: "var(--mono)" }}>{totalMiles.toFixed(1)}</div>
+          <div style={{ fontSize: 10, color: "#555", fontFamily: "var(--mono)" }}>Total Miles</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#F59E0B", fontFamily: "var(--mono)" }}>{longestRun.toFixed(2)}</div>
+          <div style={{ fontSize: 10, color: "#555", fontFamily: "var(--mono)" }}>Longest (mi)</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: bestPace <= 600 ? "#22C55E" : "#fff", fontFamily: "var(--mono)" }}>{formatPace(bestPace)}</div>
+          <div style={{ fontSize: 10, color: "#555", fontFamily: "var(--mono)" }}>Best Pace</div>
+        </div>
+      </div>
+
+      {sorted.map((run) => {
+        const pace = run.distance > 0 ? run.duration / run.distance : 0;
+        const d = new Date(run.date + "T12:00:00");
+        const label = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        return (
+          <div key={run.date} style={{
+            padding: "12px 14px", background: "rgba(255,255,255,0.03)",
+            borderRadius: 8, marginBottom: 6
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 13, color: "#ccc", fontFamily: "var(--body)" }}>{label}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: "var(--mono)" }}>{run.distance} mi</div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: "#555", fontFamily: "var(--mono)" }}>{formatDuration(run.duration)}</div>
+              <div style={{ fontSize: 12, color: pace <= 600 ? "#22C55E" : "#888", fontFamily: "var(--mono)" }}>{formatPace(pace)} /mi</div>
+            </div>
+            {run.notes && <div style={{ fontSize: 11, color: "#555", fontFamily: "var(--body)", marginTop: 4 }}>{run.notes}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const HistoryView = ({ log }) => {
   const entries = Object.entries(log).filter(([_, h]) => h.length > 0).sort((a, b) => a[0].localeCompare(b[0]));
 
@@ -501,6 +713,9 @@ export default function WorkoutCoach({ onBack }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [runs, setRuns] = useState([]);
+  const [showRunning, setShowRunning] = useState(false);
+  const [runTab, setRunTab] = useState("log");
 
   const doLoadLog = useCallback(async () => {
     setLoading(true);
@@ -508,6 +723,8 @@ export default function WorkoutCoach({ onBack }) {
     try {
       const l = await loadLog();
       setLog(l);
+      const r = await loadRunLog();
+      setRuns(r);
     } catch (e) {
       setLoadError(e.message || "Failed to load workout log");
     } finally {
@@ -576,6 +793,55 @@ export default function WorkoutCoach({ onBack }) {
     );
   }
 
+  const handleSaveRun = async (run) => {
+    await saveRun(run);
+    const updated = await loadRunLog();
+    setRuns(updated);
+  };
+
+  // Running screen
+  if (showRunning) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0D0D0D", fontFamily: "var(--body)", padding: "0 0 40px 0", ...cssVars }}>
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+        <div style={{ padding: "16px 20px 0", display: "flex", alignItems: "center" }}>
+          <button onClick={() => setShowRunning(false)} style={{
+            background: "rgba(255,255,255,0.06)", border: "none", color: "#888",
+            padding: "8px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--mono)"
+          }}>{"\u2190"} Back</button>
+          <div style={{ fontSize: 13, color: "#555", fontFamily: "var(--mono)", marginLeft: "auto" }}>{"\ud83c\udfc3\u200d\u2640\ufe0f"} Running</div>
+        </div>
+
+        <div style={{ padding: "24px 20px 16px" }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1.1 }}>Running</h1>
+          <div style={{ fontSize: 13, color: "#22C55E", fontFamily: "var(--mono)", marginTop: 4 }}>Goal: 5K at 10:00/mi pace</div>
+        </div>
+
+        <div style={{ padding: "0 20px", display: "flex", gap: 4, marginBottom: 20 }}>
+          <button onClick={() => setRunTab("log")} style={{
+            flex: 1, padding: "10px", borderRadius: 8, border: "none", fontSize: 13,
+            fontFamily: "var(--mono)", cursor: "pointer",
+            background: runTab === "log" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)",
+            color: runTab === "log" ? "#fff" : "#555"
+          }}>Log a Run</button>
+          <button onClick={() => setRunTab("history")} style={{
+            flex: 1, padding: "10px", borderRadius: 8, border: "none", fontSize: 13,
+            fontFamily: "var(--mono)", cursor: "pointer",
+            background: runTab === "history" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)",
+            color: runTab === "history" ? "#fff" : "#555"
+          }}>Run History{runs.length > 0 ? ` (${runs.length})` : ""}</button>
+        </div>
+
+        {runTab === "log" ? (
+          <RunLogger runs={runs} onSave={handleSaveRun} />
+        ) : (
+          <RunHistoryView runs={runs} />
+        )}
+      </div>
+    );
+  }
+
   // Home screen
   if (!selectedDay) {
     return (
@@ -614,6 +880,37 @@ export default function WorkoutCoach({ onBack }) {
         ) : (
           <>
             <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Running Card */}
+              <button
+                onClick={() => setShowRunning(true)}
+                style={{
+                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: 16, padding: "24px 20px", textAlign: "left", cursor: "pointer",
+                  position: "relative", overflow: "hidden"
+                }}
+              >
+                <div style={{ position: "absolute", top: 0, left: 0, width: 4, height: "100%", background: "#22C55E" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <span style={{ fontSize: 28 }}>{"\ud83c\udfc3\u200d\u2640\ufe0f"}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>Running</div>
+                      {runs.length > 0 && (() => {
+                        const best = Math.max(...runs.map(r => Number(r.distance)));
+                        return best >= 3.1 ? (
+                          <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "rgba(34,197,94,0.15)", color: "#22C55E", fontFamily: "var(--mono)", fontWeight: 600 }}>5K REACHED</span>
+                        ) : null;
+                      })()}
+                    </div>
+                    <div style={{ fontSize: 13, color: "#666", fontFamily: "var(--mono)", marginTop: 2 }}>
+                      {runs.length > 0
+                        ? `${runs.length} run${runs.length !== 1 ? "s" : ""} logged \u00b7 goal: 5K at 10:00/mi`
+                        : "Log runs, track pace \u00b7 goal: 5K at 10:00/mi"}
+                    </div>
+                  </div>
+                </div>
+              </button>
+
               {Object.entries(WORKOUTS).map(([key, w]) => {
                 const dayExercises = [...w.circuits.flatMap(c => c.exercises), ...(w.abs?.exercises || [])].filter(e => e.trackWeight);
                 const loggedCount = dayExercises.filter(e => {

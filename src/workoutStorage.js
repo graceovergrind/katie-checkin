@@ -37,3 +37,19 @@ export async function saveLog(log) {
     if (error) throw error;
   }
 }
+
+export async function loadRunLog() {
+  const { data, error } = await supabase
+    .from("running_log")
+    .select("*")
+    .order("date", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveRun(run) {
+  const { error } = await supabase
+    .from("running_log")
+    .upsert(run, { onConflict: "date" });
+  if (error) throw error;
+}
