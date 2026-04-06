@@ -5,6 +5,39 @@ function getExerciseKey(dayKey, exerciseName) {
   return `${dayKey}::${exerciseName.toLowerCase().replace(/\s+/g, "-")}`;
 }
 
+// Parse seconds from reps like "30 sec", "30-45 sec", "20-30 sec each side"
+function parseTimedSeconds(reps) {
+  const match = reps.match(/(\d+)(?:-(\d+))?\s*sec/i);
+  if (!match) return null;
+  // Use the higher end of ranges (e.g. "30-45 sec" -> 45)
+  return parseInt(match[2] || match[1]);
+}
+
+// Generate an alarm beep using Web Audio API
+function playAlarm() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const playBeep = (time, freq, dur) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = "square";
+      gain.gain.setValueAtTime(0.3, time);
+      gain.gain.exponentialRampToValueAtTime(0.01, time + dur);
+      osc.start(time);
+      osc.stop(time + dur);
+    };
+    // Three ascending beeps
+    playBeep(ctx.currentTime, 660, 0.15);
+    playBeep(ctx.currentTime + 0.2, 880, 0.15);
+    playBeep(ctx.currentTime + 0.4, 1100, 0.25);
+  } catch (e) {
+    // Audio not available — silent fallback
+  }
+}
+
 function getRecommendation(history) {
   if (!history || history.length === 0) return null;
   const recent = history.slice(-3);
@@ -195,7 +228,7 @@ const RestTimer = ({ onComplete }) => {
 
   useEffect(() => {
     if (!running || seconds <= 0) {
-      if (seconds <= 0) onComplete?.();
+      if (seconds <= 0) { playAlarm(); onComplete?.(); }
       return;
     }
     const t = setTimeout(() => setSeconds(s => s - 1), 1000);
@@ -223,6 +256,59 @@ const RestTimer = ({ onComplete }) => {
           background: "rgba(255,255,255,0.1)", border: "none", color: "#888",
           padding: "10px 24px", borderRadius: 8, fontSize: 14, cursor: "pointer", fontFamily: "var(--mono)"
         }}>Skip</button>
+      </div>
+    </div>
+  );
+};
+
+const ExerciseTimer = ({ seconds: initialSeconds, label, accentColor, onDone }) => {
+  const [seconds, setSeconds] = useState(initialSeconds);
+  const [running, setRunning] = useState(false);
+  const [finished, setFinished] = useState(false);
+
+  useEffect(() => {
+    if (!running || seconds <= 0) {
+      if (running && seconds <= 0) { playAlarm(); setFinished(true); setRunning(false); }
+      return;
+    }
+    const t = setTimeout(() => setSeconds(s => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [seconds, running]);
+
+  const handleReset = () => { setSeconds(initialSeconds); setFinished(false); setRunning(false); };
+
+  return (
+    <div style={{
+      marginTop: 10, padding: "16px 12px", background: finished ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.04)",
+      borderRadius: 10, textAlign: "center"
+    }}>
+      {label && <div style={{ fontSize: 11, color: "#888", fontFamily: "var(--mono)", marginBottom: 6 }}>{label}</div>}
+      <div style={{
+        fontSize: 40, fontWeight: 700, fontFamily: "var(--mono)",
+        color: finished ? "#22C55E" : seconds <= 5 && running ? "#E85D4A" : "#fff",
+        transition: "color 0.3s"
+      }}>
+        {finished ? "\u2713" : `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`}
+      </div>
+      <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 10 }}>
+        {!finished ? (
+          <button onClick={() => setRunning(!running)} style={{
+            background: running ? "rgba(255,255,255,0.1)" : accentColor,
+            border: "none", color: "#fff",
+            padding: "8px 20px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--mono)"
+          }}>{running ? "Pause" : "Start"}</button>
+        ) : (
+          <button onClick={handleReset} style={{
+            background: "rgba(255,255,255,0.1)", border: "none", color: "#888",
+            padding: "8px 20px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--mono)"
+          }}>Reset</button>
+        )}
+        {onDone && finished && (
+          <button onClick={onDone} style={{
+            background: "rgba(255,255,255,0.1)", border: "none", color: "#888",
+            padding: "8px 20px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--mono)"
+          }}>Done</button>
+        )}
       </div>
     </div>
   );
@@ -343,10 +429,14 @@ const WeightInput = ({ exerciseKey, log, onLog, accentColor, unit }) => {
 const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) => {
   const [showCoaching, setShowCoaching] = useState(false);
   const [showWeight, setShowWeight] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
   const exKey = getExerciseKey(dayKey, exercise.name);
   const history = log[exKey] || [];
   const rec = getRecommendation(history);
   const lastWeight = getLastWeight(history);
+  const timedSeconds = parseTimedSeconds(exercise.reps);
+  const isTimed = timedSeconds !== null;
+  const hasSides = /each side|each direction/i.test(exercise.reps);
 
   return (
     <div style={{
@@ -381,9 +471,23 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 8 }}>
+          {isTimed && (
+            <button
+              onClick={() => { setShowTimer(!showTimer); if (!showTimer) { setShowCoaching(false); setShowWeight(false); } }}
+              style={{
+                background: showTimer ? accentColor : "rgba(255,255,255,0.08)",
+                border: "none", color: showTimer ? "#fff" : "#aaa",
+                width: 36, height: 36, borderRadius: 8, fontSize: 14,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.2s"
+              }}
+              aria-label="Toggle timer"
+              aria-expanded={showTimer}
+            >{"\u23f1"}</button>
+          )}
           {exercise.trackWeight && (
             <button
-              onClick={() => { setShowWeight(!showWeight); if (!showWeight) setShowCoaching(false); }}
+              onClick={() => { setShowWeight(!showWeight); if (!showWeight) { setShowCoaching(false); setShowTimer(false); } }}
               style={{
                 background: showWeight ? accentColor : "rgba(255,255,255,0.08)",
                 border: "none", color: showWeight ? "#fff" : "#aaa",
@@ -396,7 +500,7 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
             >{"\u2696"}</button>
           )}
           <button
-            onClick={() => { setShowCoaching(!showCoaching); if (!showCoaching) setShowWeight(false); }}
+            onClick={() => { setShowCoaching(!showCoaching); if (!showCoaching) { setShowWeight(false); setShowTimer(false); } }}
             aria-label="Toggle coaching tips"
             aria-expanded={showCoaching}
             style={{
@@ -409,6 +513,17 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
           >?</button>
         </div>
       </div>
+
+      {showTimer && isTimed && (
+        hasSides ? (
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <div style={{ flex: 1 }}><ExerciseTimer seconds={timedSeconds} label="Side 1" accentColor={accentColor} /></div>
+            <div style={{ flex: 1 }}><ExerciseTimer seconds={timedSeconds} label="Side 2" accentColor={accentColor} /></div>
+          </div>
+        ) : (
+          <ExerciseTimer seconds={timedSeconds} accentColor={accentColor} />
+        )
+      )}
 
       {showCoaching && (
         <div style={{
@@ -738,34 +853,65 @@ export default function WorkoutCoach({ onBack }) {
 
   const resetWorkout = useCallback(() => {
     setPhase("warmup"); setCircuitIdx(0); setRoundNum(1);
-    setResting(false); setCompleted(false);
+    setResting(false); setCompleted(false); setRestType(null);
   }, []);
 
+  // Keep screen awake during active workouts
+  useEffect(() => {
+    if (!selectedDay || completed) return;
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLock = await navigator.wakeLock.request("screen");
+        }
+      } catch (e) {
+        // Wake Lock not available or denied — silent fallback
+      }
+    };
+    requestWakeLock();
+    // Re-acquire on visibility change (e.g. switching tabs back)
+    const handleVisibility = () => { if (document.visibilityState === "visible") requestWakeLock(); };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (wakeLock) wakeLock.release().catch(() => {});
+    };
+  }, [selectedDay, completed]);
+
   const workout = selectedDay ? WORKOUTS[selectedDay] : null;
+
+  // Track whether rest is between rounds of the same circuit/abs, or between circuits
+  const [restType, setRestType] = useState(null); // "round" or "circuit"
 
   const handleNext = () => {
     if (phase === "warmup") {
       setPhase("circuits"); setCircuitIdx(0); setRoundNum(1);
     } else if (phase === "circuits") {
       const circuit = workout.circuits[circuitIdx];
-      if (roundNum < circuit.rounds) { setResting(true); }
+      if (roundNum < circuit.rounds) { setRestType("round"); setResting(true); }
       else if (circuitIdx < workout.circuits.length - 1) {
-        setCircuitIdx(circuitIdx + 1); setRoundNum(1); setResting(true);
+        setCircuitIdx(circuitIdx + 1); setRoundNum(1); setRestType("circuit"); setResting(true);
       } else { setPhase("abs"); setRoundNum(1); }
     } else if (phase === "abs") {
-      if (roundNum < workout.abs.rounds) { setResting(true); }
+      if (roundNum < workout.abs.rounds) { setRestType("round"); setResting(true); }
       else { setPhase("cooldown"); }
     } else if (phase === "cooldown") { setCompleted(true); }
   };
 
   const handleRestComplete = () => {
     setResting(false);
-    if (phase === "circuits") {
-      const circuit = workout.circuits[circuitIdx];
-      if (roundNum < circuit.rounds) setRoundNum(roundNum + 1);
-    } else if (phase === "abs") {
-      if (roundNum < workout.abs.rounds) setRoundNum(roundNum + 1);
+    // Only increment round when resting between rounds of the same section
+    if (restType === "round") {
+      if (phase === "circuits") {
+        const circuit = workout.circuits[circuitIdx];
+        if (roundNum < circuit.rounds) setRoundNum(roundNum + 1);
+      } else if (phase === "abs") {
+        if (roundNum < workout.abs.rounds) setRoundNum(roundNum + 1);
+      }
     }
+    // "circuit" rest type = transitioning to new circuit, round already set to 1
+    setRestType(null);
   };
 
   const cssVars = { "--mono": "'JetBrains Mono', monospace", "--body": "'Outfit', sans-serif" };
