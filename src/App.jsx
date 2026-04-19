@@ -278,8 +278,9 @@ const InsightsView = ({ entries }) => {
   sorted.filter((e) => e.weight).forEach((e) => {
     const d = new Date(e.date + "T00:00:00");
     const diff = d.getDate() - d.getDay();
-    const sun = new Date(d.setDate(diff));
-    const key = `${sun.getMonth() + 1}/${sun.getDate()}`;
+    const sun = new Date(d);
+    sun.setDate(diff);
+    const key = `${sun.getFullYear()}-${sun.getMonth() + 1}/${sun.getDate()}`;
     if (!weeklyWeightMap[key]) weeklyWeightMap[key] = [];
     weeklyWeightMap[key].push(parseFloat(e.weight));
   });
