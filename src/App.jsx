@@ -510,6 +510,31 @@ function generateReport(entries) {
   let r = `KATIE'S CHECK-IN DATA — Last ${recent.length} entries\n`;
   r += `Generated: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}\n`;
   r += "══════════════════════════════════════════════════\n\n";
+  const weekMap = {};
+  sorted.filter((e) => e.weight).forEach((e) => {
+    const d = new Date(e.date + "T00:00:00");
+    const sun = new Date(e.date + "T00:00:00");
+    sun.setDate(d.getDate() - d.getDay());
+    const key = sun.toISOString().slice(0, 10);
+    if (!weekMap[key]) weekMap[key] = [];
+    weekMap[key].push(parseFloat(e.weight));
+  });
+  const weeklyAvgs = Object.entries(weekMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateStr, vals]) => ({
+      label: new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      avg: +(vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1),
+    }));
+  if (weeklyAvgs.length >= 1) {
+    r += "WEEKLY WEIGHT AVERAGES (Sun–Sat):\n";
+    weeklyAvgs.forEach(({ label, avg }, i) => {
+      const change = i > 0 ? +(avg - weeklyAvgs[i - 1].avg).toFixed(1) : null;
+      r += `  Wk of ${label}: ${avg} lbs`;
+      if (change !== null) r += `  (${change > 0 ? "+" : ""}${change})`;
+      r += "\n";
+    });
+    r += "\n";
+  }
   const weights = recent.filter((e) => e.weight).map((e) => ({ date: e.date, w: parseFloat(e.weight) }));
   if (weights.length > 0) {
     r += `WEIGHT: ${weights[weights.length - 1].w} lbs (latest)`;
