@@ -274,6 +274,20 @@ const InsightsView = ({ entries }) => {
   const remaining = currentWeight ? currentWeight - 165 : 52;
   const pctComplete = totalLost > 0 ? Math.round((totalLost / 52) * 100) : 0;
 
+  const weeklyWeightMap = {};
+  sorted.filter((e) => e.weight).forEach((e) => {
+    const d = new Date(e.date + "T00:00:00");
+    const diff = d.getDate() - d.getDay();
+    const sun = new Date(d.setDate(diff));
+    const key = `${sun.getMonth() + 1}/${sun.getDate()}`;
+    if (!weeklyWeightMap[key]) weeklyWeightMap[key] = [];
+    weeklyWeightMap[key].push(parseFloat(e.weight));
+  });
+  const weeklyWeightData = Object.entries(weeklyWeightMap).map(([week, vals]) => ({
+    week,
+    avg: +(vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1),
+  }));
+
   const stepsData = recent.filter((e) => e.steps).map((e) => ({ date: shortDate(e.date), steps: parseInt(e.steps) }));
   const avgSteps = stepsData.length > 0 ? Math.round(stepsData.reduce((s, d) => s + d.steps, 0) / stepsData.length) : 0;
   const daysAbove7k = stepsData.filter((d) => d.steps >= 7000).length;
@@ -329,6 +343,28 @@ const InsightsView = ({ entries }) => {
             </AreaChart>
           </ResponsiveContainer>
           <div style={{ textAlign: "right", fontSize: 10, color: theme.textDim, marginTop: 4 }}>— goal: 165 lbs</div>
+        </Card>
+      )}
+
+      {weeklyWeightData.length >= 2 && (
+        <Card>
+          <CardTitle color={theme.gold}>Weekly Weight Average</CardTitle>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={weeklyWeightData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="wwg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={theme.gold} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={theme.gold} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="week" tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
+              <YAxis domain={["dataMin - 2", "dataMax + 2"]} tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
+              <Tooltip content={<TT formatter={(p) => `${p.value} lbs avg`} />} />
+              <ReferenceLine y={165} stroke={theme.green} strokeDasharray="4 4" strokeOpacity={0.5} />
+              <Area type="monotone" dataKey="avg" stroke={theme.gold} strokeWidth={2.5} fill="url(#wwg)" dot={{ r: 3, fill: theme.gold }} activeDot={{ r: 5 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div style={{ textAlign: "right", fontSize: 10, color: theme.textDim, marginTop: 4 }}>week starting Sun · — goal: 165 lbs</div>
         </Card>
       )}
 
