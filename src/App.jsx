@@ -279,7 +279,7 @@ const InsightsView = ({ entries }) => {
     const d = new Date(e.date + "T00:00:00");
     const sun = new Date(e.date + "T00:00:00");
     sun.setDate(d.getDate() - d.getDay());
-    const key = sun.toISOString().slice(0, 10);
+    const key = `${sun.getFullYear()}-${String(sun.getMonth() + 1).padStart(2, '0')}-${String(sun.getDate()).padStart(2, '0')}`;
     if (!weeklyWeightMap[key]) weeklyWeightMap[key] = [];
     weeklyWeightMap[key].push(parseFloat(e.weight));
   });
@@ -517,7 +517,7 @@ function generateReport(entries) {
     const d = new Date(e.date + "T00:00:00");
     const sun = new Date(e.date + "T00:00:00");
     sun.setDate(d.getDate() - d.getDay());
-    const key = sun.toISOString().slice(0, 10);
+    const key = `${sun.getFullYear()}-${String(sun.getMonth() + 1).padStart(2, '0')}-${String(sun.getDate()).padStart(2, '0')}`;
     if (!weekMap[key]) weekMap[key] = [];
     weekMap[key].push(parseFloat(e.weight));
   });
