@@ -297,6 +297,22 @@ const InsightsView = ({ entries, workoutLog = {}, runLog = [] }) => {
   const remaining = currentWeight ? currentWeight - 165 : 52;
   const pctComplete = totalLost > 0 ? Math.round((totalLost / 52) * 100) : 0;
 
+  const weeklyWeightMap = {};
+  sorted.filter((e) => e.weight).forEach((e) => {
+    const d = new Date(e.date + "T00:00:00");
+    const sun = new Date(e.date + "T00:00:00");
+    sun.setDate(d.getDate() - d.getDay());
+    const key = `${sun.getFullYear()}-${String(sun.getMonth() + 1).padStart(2, '0')}-${String(sun.getDate()).padStart(2, '0')}`;
+    if (!weeklyWeightMap[key]) weeklyWeightMap[key] = [];
+    weeklyWeightMap[key].push(parseFloat(e.weight));
+  });
+  const weeklyWeightData = Object.entries(weeklyWeightMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([isoKey, vals]) => ({
+      week: new Date(isoKey + "T00:00:00").toLocaleDateString("en-US", { month: "numeric", day: "numeric" }),
+      avg: +(vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1),
+    }));
+
   const stepsData = recent.filter((e) => e.steps).map((e) => ({ date: shortDate(e.date), steps: parseInt(e.steps) }));
   const avgSteps = stepsData.length > 0 ? Math.round(stepsData.reduce((s, d) => s + d.steps, 0) / stepsData.length) : 0;
   const daysAbove7k = stepsData.filter((d) => d.steps >= 7000).length;
@@ -352,6 +368,28 @@ const InsightsView = ({ entries, workoutLog = {}, runLog = [] }) => {
             </AreaChart>
           </ResponsiveContainer>
           <div style={{ textAlign: "right", fontSize: 10, color: theme.textDim, marginTop: 4 }}>— goal: 165 lbs</div>
+        </Card>
+      )}
+
+      {weeklyWeightData.length >= 2 && (
+        <Card>
+          <CardTitle color={theme.gold}>Weekly Weight Average</CardTitle>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={weeklyWeightData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="wwg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={theme.gold} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={theme.gold} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="week" tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
+              <YAxis domain={["dataMin - 2", "dataMax + 2"]} tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
+              <Tooltip content={<TT formatter={(p) => `${p.value} lbs avg`} />} />
+              <ReferenceLine y={165} stroke={theme.green} strokeDasharray="4 4" strokeOpacity={0.5} />
+              <Area type="monotone" dataKey="avg" stroke={theme.gold} strokeWidth={2.5} fill="url(#wwg)" dot={{ r: 3, fill: theme.gold }} activeDot={{ r: 5 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div style={{ textAlign: "right", fontSize: 10, color: theme.textDim, marginTop: 4 }}>week starting Sun · — goal: 165 lbs</div>
         </Card>
       )}
 
@@ -744,6 +782,31 @@ function generateReport(entries) {
   let r = `KATIE'S CHECK-IN DATA — Last ${recent.length} entries\n`;
   r += `Generated: ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}\n`;
   r += "══════════════════════════════════════════════════\n\n";
+  const weekMap = {};
+  sorted.filter((e) => e.weight).forEach((e) => {
+    const d = new Date(e.date + "T00:00:00");
+    const sun = new Date(e.date + "T00:00:00");
+    sun.setDate(d.getDate() - d.getDay());
+    const key = `${sun.getFullYear()}-${String(sun.getMonth() + 1).padStart(2, '0')}-${String(sun.getDate()).padStart(2, '0')}`;
+    if (!weekMap[key]) weekMap[key] = [];
+    weekMap[key].push(parseFloat(e.weight));
+  });
+  const weeklyAvgs = Object.entries(weekMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateStr, vals]) => ({
+      label: new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      avg: +(vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1),
+    }));
+  if (weeklyAvgs.length >= 1) {
+    r += "WEEKLY WEIGHT AVERAGES (Sun–Sat):\n";
+    weeklyAvgs.forEach(({ label, avg }, i) => {
+      const change = i > 0 ? +(avg - weeklyAvgs[i - 1].avg).toFixed(1) : null;
+      r += `  Wk of ${label}: ${avg} lbs`;
+      if (change !== null) r += `  (${change > 0 ? "+" : ""}${change})`;
+      r += "\n";
+    });
+    r += "\n";
+  }
   const weights = recent.filter((e) => e.weight).map((e) => ({ date: e.date, w: parseFloat(e.weight) }));
   if (weights.length > 0) {
     r += `WEIGHT: ${weights[weights.length - 1].w} lbs (latest)`;
