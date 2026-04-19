@@ -277,17 +277,18 @@ const InsightsView = ({ entries }) => {
   const weeklyWeightMap = {};
   sorted.filter((e) => e.weight).forEach((e) => {
     const d = new Date(e.date + "T00:00:00");
-    const diff = d.getDate() - d.getDay();
-    const sun = new Date(d);
-    sun.setDate(diff);
-    const key = `${sun.getFullYear()}-${sun.getMonth() + 1}/${sun.getDate()}`;
+    const sun = new Date(e.date + "T00:00:00");
+    sun.setDate(d.getDate() - d.getDay());
+    const key = sun.toISOString().slice(0, 10);
     if (!weeklyWeightMap[key]) weeklyWeightMap[key] = [];
     weeklyWeightMap[key].push(parseFloat(e.weight));
   });
-  const weeklyWeightData = Object.entries(weeklyWeightMap).map(([week, vals]) => ({
-    week,
-    avg: +(vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1),
-  }));
+  const weeklyWeightData = Object.entries(weeklyWeightMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([isoKey, vals]) => ({
+      week: new Date(isoKey + "T00:00:00").toLocaleDateString("en-US", { month: "numeric", day: "numeric" }),
+      avg: +(vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1),
+    }));
 
   const stepsData = recent.filter((e) => e.steps).map((e) => ({ date: shortDate(e.date), steps: parseInt(e.steps) }));
   const avgSteps = stepsData.length > 0 ? Math.round(stepsData.reduce((s, d) => s + d.steps, 0) / stepsData.length) : 0;
