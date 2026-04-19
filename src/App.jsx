@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Area, AreaChart } from "recharts";
 import { storage } from "./supabase.js";
+import { loadLog, loadRunLog } from "./workoutStorage.js";
 import WorkoutCoach from "./WorkoutCoach.jsx";
 
 const PIN = import.meta.env.VITE_APP_PIN || "1234";
@@ -252,7 +253,29 @@ const TT = ({ active, payload, label, formatter }) => {
   );
 };
 
-const InsightsView = ({ entries }) => {
+const exerciseDisplayName = (key) => {
+  const parts = key.split("::");
+  const name = parts.length > 1 ? parts[1] : parts[0];
+  return name.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const dayLabel = (key) => {
+  const day = key.split("::")[0];
+  return { push: "Push", pull: "Pull", legs: "Legs" }[day] || day;
+};
+
+const dayColor = (key) => {
+  const day = key.split("::")[0];
+  return { push: "#E85D4A", pull: "#3B82C4", legs: "#7C3AED" }[day] || theme.textMuted;
+};
+
+const formatRunPace = (seconds) => {
+  const min = Math.floor(seconds / 60);
+  const sec = Math.round(seconds % 60);
+  return `${min}:${sec.toString().padStart(2, "0")}`;
+};
+
+const InsightsView = ({ entries, workoutLog = {}, runLog = [] }) => {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
   const recent = sorted.slice(-14);
   const recent7 = sorted.slice(-7);
@@ -462,6 +485,253 @@ const InsightsView = ({ entries }) => {
           </div>
         </div>
       </Card>
+
+      {/* --- Running Insights --- */}
+      {runLog.length > 0 && (() => {
+        const sortedRuns = [...runLog].sort((a, b) => a.date.localeCompare(b.date));
+        const longestRun = Math.max(...sortedRuns.map(r => Number(r.distance)));
+        const bestPaceRun = sortedRuns.filter(r => r.distance > 0).reduce((best, r) => {
+          const pace = r.duration / r.distance;
+          return pace < best.pace ? { pace, run: r } : best;
+        }, { pace: Infinity, run: null });
+        const totalMiles = sortedRuns.reduce((s, r) => s + Number(r.distance), 0);
+        const reached5k = longestRun >= 3.1;
+        const reached10minPace = bestPaceRun.pace <= 600;
+        const fiveKProgress = Math.min(100, Math.round((longestRun / 3.1) * 100));
+        const paceProgress = bestPaceRun.pace < Infinity ? Math.min(100, Math.round((600 / bestPaceRun.pace) * 100)) : 0;
+
+        const distanceData = sortedRuns.map(r => ({ date: shortDate(r.date), distance: Number(r.distance) }));
+        const paceData = sortedRuns.filter(r => r.distance > 0).map(r => ({
+          date: shortDate(r.date),
+          pace: +(r.duration / r.distance / 60).toFixed(2),
+        }));
+
+        return (
+          <>
+            <Card style={{ background: `linear-gradient(135deg, ${theme.surface}, #1a2e1a)` }}>
+              <CardTitle color="#22C55E">Running Goals</CardTitle>
+              <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 16 }}>
+                <StatBox label="Runs" value={sortedRuns.length} sub="total" color={theme.blue} />
+                <StatBox label="Total" value={totalMiles.toFixed(1)} sub="miles" color={theme.green} />
+                <StatBox label="Longest" value={longestRun.toFixed(2)} sub="miles" color={theme.gold} />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.textMuted, fontFamily: font, marginBottom: 4 }}>
+                  <span>5K Distance (3.1 mi)</span>
+                  <span style={{ color: reached5k ? theme.green : theme.textMuted }}>{reached5k ? "Reached!" : `${longestRun.toFixed(2)} / 3.1 mi`}</span>
+                </div>
+                <div style={{ height: 8, background: theme.bg, borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ width: `${fiveKProgress}%`, height: "100%", background: reached5k ? theme.green : `linear-gradient(90deg, #22C55E, #F59E0B)`, borderRadius: 4, transition: "width 0.5s ease" }} />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: theme.textMuted, fontFamily: font, marginBottom: 4 }}>
+                  <span>10:00/mi Pace</span>
+                  <span style={{ color: reached10minPace ? theme.green : theme.textMuted }}>
+                    {reached10minPace ? "Reached!" : bestPaceRun.pace < Infinity ? `${formatRunPace(bestPaceRun.pace)} best` : "No data"}
+                  </span>
+                </div>
+                <div style={{ height: 8, background: theme.bg, borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ width: `${paceProgress}%`, height: "100%", background: reached10minPace ? theme.green : `linear-gradient(90deg, #F59E0B, #22C55E)`, borderRadius: 4, transition: "width 0.5s ease" }} />
+                </div>
+              </div>
+            </Card>
+
+            {distanceData.length >= 2 && (
+              <Card>
+                <CardTitle color={theme.green}>Run Distance</CardTitle>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={distanceData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} unit=" mi" />
+                    <Tooltip content={<TT formatter={(p) => `${p.value} miles`} />} />
+                    <ReferenceLine y={3.1} stroke={theme.green} strokeDasharray="4 4" strokeOpacity={0.5} />
+                    <Bar dataKey="distance" radius={[4, 4, 0, 0]}>
+                      {distanceData.map((d, i) => <Cell key={i} fill={d.distance >= 3.1 ? theme.green : theme.blue} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div style={{ textAlign: "right", fontSize: 10, color: theme.textDim, marginTop: 4 }}>— 5K: 3.1 mi</div>
+              </Card>
+            )}
+
+            {paceData.length >= 2 && (
+              <Card>
+                <CardTitle color={theme.gold}>Pace Trend</CardTitle>
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={paceData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
+                    <YAxis domain={["dataMin - 0.5", "dataMax + 0.5"]} tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} unit=" min" reversed />
+                    <Tooltip content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const paceMin = payload[0].value;
+                      const totalSec = Math.round(paceMin * 60);
+                      return (
+                        <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: 8, padding: "8px 12px", fontFamily: font, fontSize: 12 }}>
+                          <div style={{ color: theme.textMuted, marginBottom: 4 }}>{label}</div>
+                          <div style={{ color: totalSec <= 600 ? theme.green : theme.text }}>{formatRunPace(totalSec)} /mi</div>
+                        </div>
+                      );
+                    }} />
+                    <ReferenceLine y={10} stroke={theme.green} strokeDasharray="4 4" strokeOpacity={0.5} />
+                    <Line type="monotone" dataKey="pace" stroke={theme.gold} strokeWidth={2.5} dot={{ r: 3, fill: theme.gold }} />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: theme.textDim, marginTop: 4, fontFamily: font }}>
+                  <span>lower = faster</span>
+                  <span style={{ color: theme.green }}>— 10:00/mi goal</span>
+                </div>
+              </Card>
+            )}
+          </>
+        );
+      })()}
+
+      {/* --- Lifting Insights --- */}
+      {Object.keys(workoutLog).length > 0 && (() => {
+        const exerciseKeys = Object.keys(workoutLog).filter((k) => workoutLog[k].length > 0);
+        if (exerciseKeys.length === 0) return null;
+
+        // Personal Records
+        const prs = exerciseKeys.map((key) => {
+          const history = workoutLog[key];
+          const maxEntry = history.reduce((best, e) => (e.weight > (best?.weight || 0) ? e : best), null);
+          return { key, name: exerciseDisplayName(key), day: dayLabel(key), color: dayColor(key), weight: maxEntry?.weight, date: maxEntry?.date, sessions: history.length };
+        }).filter((p) => p.weight > 0).sort((a, b) => b.weight - a.weight);
+
+        // Exercises with 2+ sessions for progress tracking
+        const progressExercises = exerciseKeys.filter((k) => workoutLog[k].length >= 2).map((key) => {
+          const history = workoutLog[key];
+          const first = history[0];
+          const last = history[history.length - 1];
+          const change = last.weight - first.weight;
+          return { key, name: exerciseDisplayName(key), day: dayLabel(key), color: dayColor(key), first: first.weight, last: last.weight, change, sessions: history.length, history };
+        }).sort((a, b) => b.change - a.change);
+
+        // Pick top exercise per day for the progress chart
+        const chartExercises = [];
+        const seenDays = new Set();
+        for (const ex of progressExercises) {
+          if (!seenDays.has(ex.day) && chartExercises.length < 3) {
+            chartExercises.push(ex);
+            seenDays.add(ex.day);
+          }
+        }
+
+        // Build chart data: align by session number
+        const maxSessions = Math.max(...chartExercises.map((e) => e.history.length), 0);
+        const chartData = [];
+        for (let i = 0; i < maxSessions; i++) {
+          const point = { session: i + 1 };
+          chartExercises.forEach((ex) => {
+            if (i < ex.history.length) point[ex.key] = ex.history[i].weight;
+          });
+          chartData.push(point);
+        }
+
+        // Workout split frequency from check-in entries (last 30 days)
+        const recent30 = sorted.slice(-30);
+        const splitCounts = { Push: 0, Pull: 0, Legs: 0 };
+        recent30.forEach((e) => {
+          if (e.workout === "Push") splitCounts.Push++;
+          if (e.workout === "Pull") splitCounts.Pull++;
+          if (e.workout === "Legs") splitCounts.Legs++;
+        });
+        const totalLifts = splitCounts.Push + splitCounts.Pull + splitCounts.Legs;
+
+        return (
+          <>
+            {prs.length > 0 && (
+              <Card>
+                <CardTitle color={theme.accent}>Lifting Personal Records</CardTitle>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {prs.slice(0, 8).map((pr) => (
+                    <div key={pr.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: theme.bg, borderRadius: 8, padding: "10px 12px" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: theme.text, fontFamily: font, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pr.name}</div>
+                        <div style={{ fontSize: 10, color: pr.color, fontFamily: font, marginTop: 2 }}>{pr.day} · {pr.sessions} session{pr.sessions !== 1 ? "s" : ""}</div>
+                      </div>
+                      <div style={{ textAlign: "right", marginLeft: 12 }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: theme.gold, fontFamily: "'Playfair Display', serif" }}>{pr.weight}<span style={{ fontSize: 11, fontWeight: 400, color: theme.textMuted }}> lbs</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {chartData.length >= 2 && chartExercises.length > 0 && (
+              <Card>
+                <CardTitle color={theme.green}>Strength Progress</CardTitle>
+                <div style={{ fontSize: 11, color: theme.textMuted, fontFamily: font, marginBottom: 12 }}>Top exercise per split — weight over sessions</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="session" tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} label={{ value: "Session #", position: "insideBottom", offset: -2, fontSize: 10, fill: theme.textDim }} />
+                    <YAxis tick={{ fontSize: 10, fill: theme.textDim }} axisLine={false} tickLine={false} />
+                    <Tooltip content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: 8, padding: "8px 12px", fontFamily: font, fontSize: 12 }}>
+                          <div style={{ color: theme.textMuted, marginBottom: 4 }}>Session {label}</div>
+                          {payload.map((p, i) => <div key={i} style={{ color: p.stroke }}>{exerciseDisplayName(p.dataKey)}: {p.value} lbs</div>)}
+                        </div>
+                      );
+                    }} />
+                    {chartExercises.map((ex) => (
+                      <Line key={ex.key} type="monotone" dataKey={ex.key} stroke={ex.color} strokeWidth={2} dot={{ r: 3, fill: ex.color }} connectNulls />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+                <div style={{ display: "flex", justifyContent: "center", gap: 14, fontSize: 10, color: theme.textDim, marginTop: 4, fontFamily: font, flexWrap: "wrap" }}>
+                  {chartExercises.map((ex) => (
+                    <span key={ex.key}><span style={{ color: ex.color }}>●</span> {ex.name}</span>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {progressExercises.length > 0 && (
+              <Card>
+                <CardTitle color={theme.blue}>Weight Changes</CardTitle>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {progressExercises.slice(0, 8).map((ex) => (
+                    <div key={ex.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: theme.bg, borderRadius: 8, padding: "8px 12px" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, color: theme.text, fontFamily: font, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.name}</div>
+                        <div style={{ fontSize: 10, color: theme.textDim, fontFamily: font }}>{ex.first} → {ex.last} lbs</div>
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: ex.change > 0 ? theme.green : ex.change < 0 ? theme.accent : theme.textMuted, fontFamily: font, marginLeft: 12 }}>
+                        {ex.change > 0 ? "+" : ""}{ex.change} lbs
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {totalLifts > 0 && (
+              <Card>
+                <CardTitle>Split Balance (Last 30 Days)</CardTitle>
+                <div style={{ display: "flex", justifyContent: "space-around" }}>
+                  {[
+                    { label: "Push", count: splitCounts.Push, color: "#E85D4A" },
+                    { label: "Pull", count: splitCounts.Pull, color: "#3B82C4" },
+                    { label: "Legs", count: splitCounts.Legs, color: "#7C3AED" },
+                  ].map(({ label, count, color }) => (
+                    <div key={label} style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 24, fontWeight: 800, color, fontFamily: "'Playfair Display', serif" }}>{count}</div>
+                      <div style={{ fontSize: 10, color: theme.textMuted, textTransform: "uppercase", letterSpacing: 1, marginTop: 2, fontFamily: font }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ textAlign: "center", fontSize: 12, color: theme.textMuted, marginTop: 10, fontFamily: font }}>{totalLifts} lifting sessions total</div>
+              </Card>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 };
@@ -527,6 +797,8 @@ export default function App() {
   const [saveMsg, setSaveMsg] = useState("");
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(null);
+  const [workoutLog, setWorkoutLog] = useState({});
+  const [runLog, setRunLog] = useState([]);
 
   const loadEntries = useCallback(async () => {
     try {
@@ -544,7 +816,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (authed) loadEntries();
+    if (authed) {
+      loadEntries();
+      loadLog().then(setWorkoutLog).catch((e) => console.error("Workout log load error:", e));
+      loadRunLog().then(setRunLog).catch((e) => console.error("Run log load error:", e));
+    }
     else setLoading(false);
   }, [authed, loadEntries]);
 
@@ -683,7 +959,7 @@ export default function App() {
           </div>
         )}
 
-        {view === "insights" && <InsightsView entries={entries} />}
+        {view === "insights" && <InsightsView entries={entries} workoutLog={workoutLog} runLog={runLog} />}
 
         {view === "history" && (
           <div>

@@ -65,3 +65,20 @@ CREATE POLICY "Allow all operations" ON workout_log
   FOR ALL
   USING (true)
   WITH CHECK (true);
+
+-- Running log table (for the Running feature in Workout Coach)
+CREATE TABLE running_log (
+  id BIGSERIAL PRIMARY KEY,
+  date DATE NOT NULL UNIQUE,
+  distance NUMERIC NOT NULL,           -- distance in miles
+  duration INTEGER NOT NULL,           -- duration in seconds
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE running_log ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all operations" ON running_log
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
