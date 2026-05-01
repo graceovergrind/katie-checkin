@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { loadLog, saveLog, loadRunLog, saveRun } from "./workoutStorage.js";
 
 function getExerciseKey(dayKey, exerciseName) {
@@ -463,6 +463,7 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
   const [customReps, setCustomReps] = useState(null);
   const [editingReps, setEditingReps] = useState(false);
   const [draftReps, setDraftReps] = useState("");
+  const editCancelled = useRef(false);
   const displayReps = customReps !== null
     ? exercise.reps.replace(/^\d+/, String(customReps))
     : exercise.reps;
@@ -470,9 +471,14 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
 
   const startEditReps = () => {
     setDraftReps(customReps !== null ? String(customReps) : repMatch[1]);
+    editCancelled.current = false;
     setEditingReps(true);
   };
   const commitEditReps = () => {
+    if (editCancelled.current) {
+      editCancelled.current = false;
+      return;
+    }
     const n = parseInt(draftReps, 10);
     if (Number.isFinite(n) && n > 0) setCustomReps(n);
     setEditingReps(false);
@@ -514,7 +520,7 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
                   value={draftReps}
                   onChange={e => setDraftReps(e.target.value)}
                   onBlur={commitEditReps}
-                  onKeyDown={e => { if (e.key === "Enter") commitEditReps(); if (e.key === "Escape") setEditingReps(false); }}
+                  onKeyDown={e => { if (e.key === "Enter") commitEditReps(); if (e.key === "Escape") { editCancelled.current = true; setEditingReps(false); } }}
                   autoFocus
                   style={{
                     width: 56, padding: "4px 6px", background: "rgba(255,255,255,0.08)",
