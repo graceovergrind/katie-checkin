@@ -191,7 +191,7 @@ const WORKOUTS = {
         name: "Circuit 2 \u2014 Posterior Chain", rounds: 3,
         exercises: [
           { name: "Romanian Deadlifts", reps: "10 reps", coaching: "Dumbbells or barbell. Hinge at the hips, slight knee bend. Feel the stretch in your hamstrings. Keep the weights close to your legs.", trackWeight: true, unit: "lbs each" },
-          { name: "Sumo Dumbbell Deadlifts", reps: "10 reps", coaching: "Wide stance, toes out, one heavy dumbbell at center. This hits your glutes from a different angle than the RDLs. Drive through your heels.", trackWeight: true, unit: "lbs" }
+          { name: "Wall Sits", reps: "45 sec", coaching: "Back flat against the wall, thighs parallel to the floor, knees at 90°. Hands off your legs. Breathe steady through the burn — that’s your quads and glutes building isometric strength.", trackWeight: false }
         ]
       },
       {
@@ -265,17 +265,34 @@ const ExerciseTimer = ({ seconds: initialSeconds, label, accentColor, onDone }) 
   const [seconds, setSeconds] = useState(initialSeconds);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [countdown, setCountdown] = useState(0);
 
   useEffect(() => {
+    if (countdown > 0) {
+      const t = setTimeout(() => {
+        if (countdown === 1) { setCountdown(0); setRunning(true); }
+        else setCountdown(c => c - 1);
+      }, 1000);
+      return () => clearTimeout(t);
+    }
     if (!running || seconds <= 0) {
       if (running && seconds <= 0) { playAlarm(); setFinished(true); setRunning(false); }
       return;
     }
     const t = setTimeout(() => setSeconds(s => s - 1), 1000);
     return () => clearTimeout(t);
-  }, [seconds, running]);
+  }, [seconds, running, countdown]);
 
-  const handleReset = () => { setSeconds(initialSeconds); setFinished(false); setRunning(false); };
+  const handleStart = () => {
+    if (running) { setRunning(false); return; }
+    if (countdown > 0) { setCountdown(0); return; }
+    if (seconds === initialSeconds && !finished) setCountdown(3);
+    else setRunning(true);
+  };
+
+  const handleReset = () => { setSeconds(initialSeconds); setFinished(false); setRunning(false); setCountdown(0); };
+
+  const inCountdown = countdown > 0;
 
   return (
     <div style={{
@@ -285,18 +302,21 @@ const ExerciseTimer = ({ seconds: initialSeconds, label, accentColor, onDone }) 
       {label && <div style={{ fontSize: 11, color: "#888", fontFamily: "var(--mono)", marginBottom: 6 }}>{label}</div>}
       <div style={{
         fontSize: 40, fontWeight: 700, fontFamily: "var(--mono)",
-        color: finished ? "#22C55E" : seconds <= 5 && running ? "#E85D4A" : "#fff",
+        color: finished ? "#22C55E" : inCountdown ? accentColor : seconds <= 5 && running ? "#E85D4A" : "#fff",
         transition: "color 0.3s"
       }}>
-        {finished ? "\u2713" : `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`}
+        {finished ? "\u2713" : inCountdown ? countdown : `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`}
       </div>
+      {inCountdown && (
+        <div style={{ fontSize: 11, color: "#888", fontFamily: "var(--mono)", marginTop: 4, letterSpacing: 1.5, textTransform: "uppercase" }}>Get ready</div>
+      )}
       <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 10 }}>
         {!finished ? (
-          <button onClick={() => setRunning(!running)} style={{
-            background: running ? "rgba(255,255,255,0.1)" : accentColor,
+          <button onClick={handleStart} style={{
+            background: running || inCountdown ? "rgba(255,255,255,0.1)" : accentColor,
             border: "none", color: "#fff",
             padding: "8px 20px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--mono)"
-          }}>{running ? "Pause" : "Start"}</button>
+          }}>{inCountdown ? "Cancel" : running ? "Pause" : "Start"}</button>
         ) : (
           <button onClick={handleReset} style={{
             background: "rgba(255,255,255,0.1)", border: "none", color: "#888",
@@ -438,6 +458,27 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
   const isTimed = timedSeconds !== null;
   const hasSides = /each side|each direction/i.test(exercise.reps);
 
+  const repMatch = exercise.reps.match(/^(\d+)/);
+  const canEditReps = !isTimed && repMatch !== null;
+  const [customReps, setCustomReps] = useState(null);
+  const [editingReps, setEditingReps] = useState(false);
+  const [draftReps, setDraftReps] = useState("");
+  const displayReps = customReps !== null
+    ? exercise.reps.replace(/^\d+/, String(customReps))
+    : exercise.reps;
+  const repsSuffix = canEditReps ? exercise.reps.replace(/^\d+\s*/, "") : "";
+
+  const startEditReps = () => {
+    setDraftReps(customReps !== null ? String(customReps) : repMatch[1]);
+    setEditingReps(true);
+  };
+  const commitEditReps = () => {
+    const n = parseInt(draftReps, 10);
+    if (Number.isFinite(n) && n > 0) setCustomReps(n);
+    setEditingReps(false);
+  };
+  const resetReps = () => { setCustomReps(null); setEditingReps(false); };
+
   return (
     <div style={{
       background: isActive ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
@@ -463,10 +504,59 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
               }}>{"\u2193"} DROP</span>
             )}
           </div>
-          <div style={{ fontSize: 13, color: accentColor, fontFamily: "var(--mono)", marginTop: 2 }}>
-            {exercise.reps}
+          <div style={{ fontSize: 13, color: accentColor, fontFamily: "var(--mono)", marginTop: 2, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+            {editingReps ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  value={draftReps}
+                  onChange={e => setDraftReps(e.target.value)}
+                  onBlur={commitEditReps}
+                  onKeyDown={e => { if (e.key === "Enter") commitEditReps(); if (e.key === "Escape") setEditingReps(false); }}
+                  autoFocus
+                  style={{
+                    width: 56, padding: "4px 6px", background: "rgba(255,255,255,0.08)",
+                    border: `1px solid ${accentColor}`, borderRadius: 6,
+                    color: "#fff", fontSize: 13, fontFamily: "var(--mono)",
+                    outline: "none", textAlign: "center"
+                  }}
+                />
+                {repsSuffix && <span>{repsSuffix}</span>}
+              </span>
+            ) : (
+              <>
+                <span>{displayReps}</span>
+                {customReps !== null && (
+                  <span style={{ fontSize: 10, color: "#555" }}>(was {repMatch[1]})</span>
+                )}
+                {canEditReps && (
+                  <button
+                    onClick={startEditReps}
+                    aria-label="Edit reps"
+                    style={{
+                      background: "transparent", border: "none", color: "#666",
+                      cursor: "pointer", padding: "2px 4px", fontSize: 12,
+                      fontFamily: "var(--mono)", lineHeight: 1
+                    }}
+                  >✎</button>
+                )}
+                {customReps !== null && (
+                  <button
+                    onClick={resetReps}
+                    aria-label="Reset reps"
+                    style={{
+                      background: "transparent", border: "none", color: "#666",
+                      cursor: "pointer", padding: "2px 4px", fontSize: 11,
+                      fontFamily: "var(--mono)", lineHeight: 1
+                    }}
+                  >reset</button>
+                )}
+              </>
+            )}
             {lastWeight !== null && (
-              <span style={{ color: "#555", marginLeft: 8 }}>@ {lastWeight} {exercise.unit || "lbs"}</span>
+              <span style={{ color: "#555", marginLeft: "auto" }}>@ {lastWeight} {exercise.unit || "lbs"}</span>
             )}
           </div>
         </div>
