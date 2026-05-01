@@ -77,22 +77,12 @@ const WORKOUTS = {
     },
     circuits: [
       {
-        name: "Circuit 1 \u2014 Chest & Shoulders", rounds: 3,
+        name: "Main Circuit \u2014 Chest, Shoulders & Triceps", rounds: 3,
         exercises: [
           { name: "Incline Dumbbell Press", reps: "10 reps", coaching: "Set the bench to about 30-45\u00b0. Incline is better for your posture than flat \u2014 it shifts load off your anterior delts. Control the descent.", trackWeight: true, unit: "lbs each" },
-          { name: "Lateral Raises", reps: "12 reps", coaching: "Light weight, slow reps. Lead with your elbows, not your hands. Stop at shoulder height. Ego-check the weight \u2014 these should burn, not swing.", trackWeight: true, unit: "lbs each" }
-        ]
-      },
-      {
-        name: "Circuit 2 \u2014 Chest & Shoulders", rounds: 3,
-        exercises: [
+          { name: "Lateral Raises", reps: "12 reps", coaching: "Light weight, slow reps. Lead with your elbows, not your hands. Stop at shoulder height. Ego-check the weight \u2014 these should burn, not swing.", trackWeight: true, unit: "lbs each" },
           { name: "Dumbbell Flyes", reps: "12 reps", coaching: "Slow controlled stretch at the bottom \u2014 this LENGTHENS your tight pecs rather than shortening them. Think about opening your chest. This is therapeutic for your shoulder pain.", trackWeight: true, unit: "lbs each" },
-          { name: "Overhead Press", reps: "8 reps", coaching: "Standing or seated. Brace your core so you don\u2019t arch your lower back. Full lockout at the top.", trackWeight: true, unit: "lbs each" }
-        ]
-      },
-      {
-        name: "Circuit 3 \u2014 Triceps", rounds: 3,
-        exercises: [
+          { name: "Overhead Press", reps: "8 reps", coaching: "Standing or seated. Brace your core so you don\u2019t arch your lower back. Full lockout at the top.", trackWeight: true, unit: "lbs each" },
           { name: "Cable Tricep Pushdowns", reps: "12 reps", coaching: "Elbows pinned to your sides. Squeeze at the bottom. Don\u2019t let your shoulders round forward \u2014 stay tall.", trackWeight: true, unit: "lbs" },
           { name: "Skull Crushers", reps: "10 reps", coaching: "Lower to your forehead, not behind your head. Keep your elbows pointing at the ceiling, not flaring out.", trackWeight: true, unit: "lbs each" }
         ]
@@ -129,22 +119,12 @@ const WORKOUTS = {
     },
     circuits: [
       {
-        name: "Circuit 1 \u2014 Upper Back Priority", rounds: 3,
+        name: "Main Circuit \u2014 Back & Biceps", rounds: 3,
         exercises: [
           { name: "Cable Face Pulls", reps: "15 reps", coaching: "YOUR MOST IMPORTANT EXERCISE. Pull to your face, hands ending beside your ears. Squeeze your shoulder blades and hold for a beat. This builds the muscles that fight your shoulder pain.", trackWeight: true, unit: "lbs" },
-          { name: "Barbell Rows", reps: "10 reps", coaching: "Hinge forward about 45\u00b0. Pull to your belly button, not your chest. Squeeze at the top. Keep your core tight so your lower back stays neutral.", trackWeight: true, unit: "lbs total" }
-        ]
-      },
-      {
-        name: "Circuit 2 \u2014 Lats & Upper Back", rounds: 3,
-        exercises: [
+          { name: "Barbell Rows", reps: "10 reps", coaching: "Hinge forward about 45\u00b0. Pull to your belly button, not your chest. Squeeze at the top. Keep your core tight so your lower back stays neutral.", trackWeight: true, unit: "lbs total" },
           { name: "Single-Arm Dumbbell Rows", reps: "10 each side", coaching: "One hand and knee on the bench. Pull to your hip, not your armpit. Think about driving your elbow to the ceiling.", trackWeight: true, unit: "lbs" },
-          { name: "Cable Straight-Arm Pulldowns", reps: "12 reps", coaching: "Arms nearly straight, slight elbow bend. Pull the bar to your thighs in an arc. This targets lats without the armpit compression that can bother you.", trackWeight: true, unit: "lbs" }
-        ]
-      },
-      {
-        name: "Circuit 3 \u2014 Rear Delts & Biceps", rounds: 3,
-        exercises: [
+          { name: "Cable Straight-Arm Pulldowns", reps: "12 reps", coaching: "Arms nearly straight, slight elbow bend. Pull the bar to your thighs in an arc. This targets lats without the armpit compression that can bother you.", trackWeight: true, unit: "lbs" },
           { name: "Bent-Over Reverse DB Flyes", reps: "15 reps", coaching: "Hinge at the hips, let the dumbbells hang. Raise out to the sides squeezing your shoulder blades. Light weight \u2014 these are about the squeeze, not the load.", trackWeight: true, unit: "lbs each" },
           { name: "Dumbbell Curls", reps: "12 reps", coaching: "Standing, palms forward. Don\u2019t swing. Control the descent \u2014 the lowering phase builds just as much muscle.", trackWeight: true, unit: "lbs each" }
         ]
@@ -181,22 +161,12 @@ const WORKOUTS = {
     },
     circuits: [
       {
-        name: "Circuit 1 \u2014 Glute Power", rounds: 3,
+        name: "Main Circuit \u2014 Legs & Glutes", rounds: 3,
         exercises: [
           { name: "Dumbbell Hip Thrusts", reps: "10 reps", coaching: "YOUR STAR MOVEMENT. Back against the bench, heavy dumbbell on your lap at the hip crease. Drive up, squeeze glutes HARD at the top for 2 sec. Load these as heavy as you can over time.", trackWeight: true, unit: "lbs" },
-          { name: "Goblet Squats", reps: "10 reps", coaching: "Hold a dumbbell at your chest. Only go as deep as your knees feel comfortable. Push your knees out over your toes.", trackWeight: true, unit: "lbs" }
-        ]
-      },
-      {
-        name: "Circuit 2 \u2014 Posterior Chain", rounds: 3,
-        exercises: [
+          { name: "Goblet Squats", reps: "10 reps", coaching: "Hold a dumbbell at your chest. Only go as deep as your knees feel comfortable. Push your knees out over your toes.", trackWeight: true, unit: "lbs" },
           { name: "Romanian Deadlifts", reps: "10 reps", coaching: "Dumbbells or barbell. Hinge at the hips, slight knee bend. Feel the stretch in your hamstrings. Keep the weights close to your legs.", trackWeight: true, unit: "lbs each" },
-          { name: "Wall Sits", reps: "45 sec", coaching: "Back flat against the wall, thighs parallel to the floor, knees at 90°. Hands off your legs. Breathe steady through the burn — that’s your quads and glutes building isometric strength.", trackWeight: false }
-        ]
-      },
-      {
-        name: "Circuit 3 \u2014 Glute Isolation", rounds: 3,
-        exercises: [
+          { name: "Wall Sits", reps: "45 sec", coaching: "Back flat against the wall, thighs parallel to the floor, knees at 90°. Hands off your legs. Breathe steady through the burn — that’s your quads and glutes building isometric strength.", trackWeight: false },
           { name: "Single-Leg Glute Bridges", reps: "12 each side", coaching: "LEFT SIDE FIRST \u2014 give it the extra attention since that\u2019s where your pain is. If the left feels weaker, add an extra set on that side. Hold the squeeze at the top.", trackWeight: false },
           { name: "Glute Back Extensions Off Bench", reps: "12 reps", coaching: "Hang off the end of the bench face down. Round your upper back slightly and squeeze your glutes hard at the top. Hold a dumbbell at your chest to add load.", trackWeight: true, unit: "lbs" }
         ]
@@ -223,7 +193,7 @@ const WORKOUTS = {
 };
 
 const RestTimer = ({ onComplete }) => {
-  const [seconds, setSeconds] = useState(75);
+  const [seconds, setSeconds] = useState(120);
   const [running, setRunning] = useState(true);
 
   useEffect(() => {
