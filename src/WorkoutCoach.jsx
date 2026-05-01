@@ -446,7 +446,7 @@ const WeightInput = ({ exerciseKey, log, onLog, accentColor, unit }) => {
   );
 };
 
-const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) => {
+const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog, customReps, onSetCustomReps }) => {
   const [showCoaching, setShowCoaching] = useState(false);
   const [showWeight, setShowWeight] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
@@ -460,30 +460,33 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
 
   const repMatch = exercise.reps.match(/^(\d+)/);
   const canEditReps = !isTimed && repMatch !== null;
-  const [customReps, setCustomReps] = useState(null);
   const [editingReps, setEditingReps] = useState(false);
   const [draftReps, setDraftReps] = useState("");
   const editCancelled = useRef(false);
-  const displayReps = customReps !== null
+  const displayReps = customReps != null
     ? exercise.reps.replace(/^\d+/, String(customReps))
     : exercise.reps;
   const repsSuffix = canEditReps ? exercise.reps.replace(/^\d+\s*/, "") : "";
 
   const startEditReps = () => {
-    setDraftReps(customReps !== null ? String(customReps) : repMatch[1]);
+    setDraftReps(customReps != null ? String(customReps) : repMatch[1]);
     editCancelled.current = false;
     setEditingReps(true);
   };
   const commitEditReps = () => {
     if (editCancelled.current) {
       editCancelled.current = false;
+      setEditingReps(false);
       return;
     }
-    const n = parseInt(draftReps, 10);
-    if (Number.isFinite(n) && n > 0) setCustomReps(n);
+    const trimmed = draftReps.trim();
+    if (/^\d+$/.test(trimmed)) {
+      const n = Number(trimmed);
+      if (n > 0) onSetCustomReps(exKey, n);
+    }
     setEditingReps(false);
   };
-  const resetReps = () => { setCustomReps(null); setEditingReps(false); };
+  const resetReps = () => { onSetCustomReps(exKey, null); setEditingReps(false); };
 
   return (
     <div style={{
@@ -534,7 +537,7 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
             ) : (
               <>
                 <span>{displayReps}</span>
-                {customReps !== null && (
+                {customReps != null && (
                   <span style={{ fontSize: 10, color: "#555" }}>(was {repMatch[1]})</span>
                 )}
                 {canEditReps && (
@@ -548,7 +551,7 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog }) =
                     }}
                   >✎</button>
                 )}
-                {customReps !== null && (
+                {customReps != null && (
                   <button
                     onClick={resetReps}
                     aria-label="Reset reps"
@@ -927,6 +930,19 @@ export default function WorkoutCoach({ onBack }) {
   const [runs, setRuns] = useState([]);
   const [showRunning, setShowRunning] = useState(false);
   const [runTab, setRunTab] = useState("log");
+  const [customRepsMap, setCustomRepsMap] = useState({});
+
+  const handleSetCustomReps = useCallback((exKey, value) => {
+    setCustomRepsMap(prev => {
+      if (value == null) {
+        if (!(exKey in prev)) return prev;
+        const next = { ...prev };
+        delete next[exKey];
+        return next;
+      }
+      return { ...prev, [exKey]: value };
+    });
+  }, []);
 
   const doLoadLog = useCallback(async () => {
     setLoading(true);
@@ -1308,17 +1324,22 @@ export default function WorkoutCoach({ onBack }) {
 
       {!resting && (
         <div style={{ padding: "0 20px" }}>
-          {exercises.map((ex, i) => (
-            <ExerciseCard
-              key={`${phase}-${circuitIdx}-${roundNum}-${i}`}
-              exercise={ex}
-              dayKey={selectedDay}
-              isActive={phase === "circuits" || phase === "abs"}
-              accentColor={workout.color}
-              log={log}
-              onLog={setLog}
-            />
-          ))}
+          {exercises.map((ex, i) => {
+            const exKey = getExerciseKey(selectedDay, ex.name);
+            return (
+              <ExerciseCard
+                key={`${phase}-${circuitIdx}-${roundNum}-${i}`}
+                exercise={ex}
+                dayKey={selectedDay}
+                isActive={phase === "circuits" || phase === "abs"}
+                accentColor={workout.color}
+                log={log}
+                onLog={setLog}
+                customReps={customRepsMap[exKey] ?? null}
+                onSetCustomReps={handleSetCustomReps}
+              />
+            );
+          })}
         </div>
       )}
 
