@@ -50,6 +50,10 @@ const windowColor = (mins) => {
   if (mins <= 600) return theme.gold;
   return theme.accent;
 };
+const parseWorkouts = (s) => (s || "").split(",").map((x) => x.trim()).filter(Boolean);
+const joinWorkouts = (arr) => arr.join(", ");
+const hasActiveWorkout = (s) => parseWorkouts(s).some((w) => w !== "Rest");
+
 const moodToNum = { great: 4, good: 3, meh: 2, rough: 1 };
 const energyToNum = { high: 4, good: 3, low: 2, crashed: 1 };
 const stressToNum = { low: 1, medium: 2, high: 3, overwhelmed: 4 };
@@ -90,6 +94,38 @@ const PillSelect = ({ options, value, onChange, type }) => (
     })}
   </div>
 );
+
+const MultiPillSelect = ({ options, value, onChange, type, exclusive = [] }) => {
+  const selected = parseWorkouts(value);
+  const toggle = (opt) => {
+    let next;
+    if (selected.includes(opt)) {
+      next = selected.filter((s) => s !== opt);
+    } else if (exclusive.includes(opt)) {
+      next = [opt];
+    } else {
+      next = [...selected.filter((s) => !exclusive.includes(s)), opt];
+    }
+    onChange(joinWorkouts(next));
+  };
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {options.map((opt) => {
+        const active = selected.includes(opt);
+        const color = pillColor(opt, type);
+        return (
+          <button key={opt} onClick={() => toggle(opt)} style={{
+            padding: "6px 14px", borderRadius: 20,
+            border: `1.5px solid ${active ? color : theme.border}`,
+            background: active ? `${color}22` : "transparent",
+            color: active ? color : theme.textMuted,
+            fontSize: 13, fontFamily: font, fontWeight: active ? 600 : 400, cursor: "pointer",
+          }}>{opt}</button>
+        );
+      })}
+    </div>
+  );
+};
 
 const Field = ({ label, hint, children }) => (
   <div style={{ marginBottom: 20 }}>
@@ -195,7 +231,10 @@ const HistoryCard = ({ entry, onEdit, onDelete }) => {
           <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
             {entry.weight && <span style={{ fontSize: 12, color: theme.gold, fontFamily: font, fontWeight: 600 }}>{entry.weight} lbs</span>}
             {entry.steps && <span style={{ fontSize: 12, color: theme.green, fontFamily: font }}>{Number(entry.steps).toLocaleString()} steps</span>}
-            {entry.workout && entry.workout !== "Rest" && <span style={{ fontSize: 12, color: theme.blue, fontFamily: font }}>{entry.workout}</span>}
+            {parseWorkouts(entry.workout).filter((w) => w !== "Rest").map((w) => (
+              <span key={w} style={{ fontSize: 12, color: theme.blue, fontFamily: font }}>{w}</span>
+            ))}
+            {parseWorkouts(entry.workout).includes("Rest") && !hasActiveWorkout(entry.workout) && <span style={{ fontSize: 12, color: theme.textDim, fontFamily: font }}>Rest</span>}
             <span style={{ fontSize: 12, color: wColor, fontFamily: font }}>window: {entry.window_kept}</span>
             {wMins !== null && <span style={{ fontSize: 12, color: windowColor(wMins), fontFamily: font }}>({windowLabel(wMins)})</span>}
           </div>
@@ -329,7 +368,7 @@ const InsightsView = ({ entries, workoutLog = {}, runLog = [] }) => {
   const windowKeptCount = recent7.filter((e) => e.window_kept === "yes" || e.window_kept === "mostly").length;
   const waterGoodCount = recent7.filter((e) => e.water === "great" || e.water === "okay").length;
   const treatsCount = recent7.filter((e) => e.treats && e.treats.trim()).length;
-  const workoutCount = recent7.filter((e) => e.workout && e.workout !== "Rest").length;
+  const workoutCount = recent7.filter((e) => hasActiveWorkout(e.workout)).length;
 
   let windowStreak = 0;
   for (let i = sorted.length - 1; i >= 0; i--) {
@@ -673,9 +712,10 @@ const InsightsView = ({ entries, workoutLog = {}, runLog = [] }) => {
         const recent30 = sorted.slice(-30);
         const splitCounts = { Push: 0, Pull: 0, Legs: 0 };
         recent30.forEach((e) => {
-          if (e.workout === "Push") splitCounts.Push++;
-          if (e.workout === "Pull") splitCounts.Pull++;
-          if (e.workout === "Legs") splitCounts.Legs++;
+          const ws = parseWorkouts(e.workout);
+          if (ws.includes("Push")) splitCounts.Push++;
+          if (ws.includes("Pull")) splitCounts.Pull++;
+          if (ws.includes("Legs")) splitCounts.Legs++;
         });
         const totalLifts = splitCounts.Push + splitCounts.Pull + splitCounts.Legs;
 
@@ -985,8 +1025,8 @@ export default function App() {
               <Field label="Weight (lbs)" hint="After OMAD day preferred"><Input type="number" value={current.weight} onChange={update("weight")} placeholder="e.g. 215" /></Field>
               <Field label="Steps"><Input type="number" value={current.steps} onChange={update("steps")} placeholder="e.g. 8200" /></Field>
             </div>
-            <Field label="Workout"><PillSelect options={pillConfigs.workout.options} value={current.workout} onChange={update("workout")} type="workout" /></Field>
-            {current.workout && current.workout !== "Rest" && (
+            <Field label="Workout" hint="Pick all that apply — e.g. Legs + Walk"><MultiPillSelect options={pillConfigs.workout.options} value={current.workout} onChange={update("workout")} type="workout" exclusive={["Rest"]} /></Field>
+            {hasActiveWorkout(current.workout) && (
               <Field label="Workout Notes" hint="Exercises, weights, how it felt"><TextArea value={current.workout_notes} onChange={update("workout_notes")} placeholder="e.g. bench 85x8, felt strong" /></Field>
             )}
             <Field label="Sleep (hours)"><Input type="number" value={current.sleep} onChange={update("sleep")} placeholder="e.g. 7" style={{ width: 120 }} /></Field>
