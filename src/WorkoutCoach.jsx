@@ -189,6 +189,35 @@ const WORKOUTS = {
         { name: "Deep Breathing", reps: "5 slow breaths", coaching: "4 counts in, 6 counts out. Leg day complete.", trackWeight: false }
       ]
     }
+  },
+  back: {
+    name: "Back & Biceps", emoji: "🦾", color: "#14B8A6",
+    warmup: {
+      title: "Warm-Up", duration: "5 min",
+      exercises: [
+        { name: "Doorway Pec Stretch", reps: "30 sec each side", coaching: "YOUR NON-NEGOTIABLE. 2 rounds, 30 sec each. Elbow at 90°, lean through, breathe into it. Opening the chest first lets your upper back actually work in the rows that follow.", trackWeight: false },
+        { name: "Band Pull-Aparts", reps: "2×15", coaching: "Light band or cable. Squeeze the shoulder blades together to wake up the upper back before you load it.", trackWeight: false }
+      ]
+    },
+    circuits: [
+      {
+        name: "Main Circuit — Back & Biceps", rounds: 3,
+        exercises: [
+          { name: "Lat Pulldown", reps: "8-12 reps", coaching: "Your main vertical pull — high cable. Drive your elbows down and control the stretch at the top. Do 4 sets on this one (the rest of the circuit is 3).", trackWeight: true, unit: "lbs" },
+          { name: "Chest-Supported Dumbbell Row", reps: "10-12 reps", coaching: "Incline the bench to ~30° and lie face-down. This is the upper-back workhorse — rhomboids and mid-traps, with zero lower-back involvement. Let the chest support take your lower back out of it entirely.", trackWeight: true, unit: "lbs each" },
+          { name: "Single-Arm Dumbbell Row", reps: "10-12 each side", coaching: "Worth keeping for the unilateral work given your left-side pattern. Let the right and left earn their reps independently — don’t let the stronger side carry. Pull to your hip, drive the elbow to the ceiling.", trackWeight: true, unit: "lbs" },
+          { name: "Face Pulls", reps: "15 reps", coaching: "High cable. Direct hit on the rear delts and the posture work that counteracts your forward shoulder pull. Hands end beside your ears, squeeze and hold for a beat.", trackWeight: true, unit: "lbs" },
+          { name: "Dumbbell Curls", reps: "10-12 reps", coaching: "Supinate hard at the top — twist the pinky up. Control the descent, don’t swing.", trackWeight: true, unit: "lbs each" },
+          { name: "Hammer Curls", reps: "10-12 reps", coaching: "Neutral grip, thumbs up. Hits the brachialis and brachioradialis for thicker-looking arms and stronger grip.", trackWeight: true, unit: "lbs each" }
+        ]
+      }
+    ],
+    cooldown: {
+      title: "Finish", duration: "2 min",
+      exercises: [
+        { name: "Doorway Pec Stretch", reps: "30 sec each side", coaching: "2 rounds again. Bookending the session with the stretch helps the corrective stick — this is the whole point of the day.", trackWeight: false }
+      ]
+    }
   }
 };
 
@@ -974,7 +1003,8 @@ export default function WorkoutCoach({ onBack }) {
       if (roundNum < circuit.rounds) { setRestType("round"); setResting(true); }
       else if (circuitIdx < workout.circuits.length - 1) {
         setCircuitIdx(circuitIdx + 1); setRoundNum(1); setRestType("circuit"); setResting(true);
-      } else { setPhase("abs"); setRoundNum(1); }
+      } else if (workout.abs) { setPhase("abs"); setRoundNum(1); }
+      else { setPhase("cooldown"); }
     } else if (phase === "abs") {
       if (roundNum < workout.abs.rounds) { setRestType("round"); setResting(true); }
       else { setPhase("cooldown"); }
@@ -1241,7 +1271,7 @@ export default function WorkoutCoach({ onBack }) {
     exercises = workout.cooldown.exercises;
   }
 
-  const totalPhases = 3 + workout.circuits.length;
+  const totalPhases = 2 + (workout.abs ? 1 : 0) + workout.circuits.length;
   let currentPhase = phase === "warmup" ? 0
     : phase === "circuits" ? 1 + circuitIdx
     : phase === "abs" ? 1 + workout.circuits.length
@@ -1250,7 +1280,7 @@ export default function WorkoutCoach({ onBack }) {
 
   const nextLabel = phase === "warmup" ? "Start Circuit 1"
     : phase === "cooldown" ? "Finish Workout"
-    : (phase === "circuits" && roundNum >= workout.circuits[circuitIdx]?.rounds && circuitIdx >= workout.circuits.length - 1) ? "Move to Abs"
+    : (phase === "circuits" && roundNum >= workout.circuits[circuitIdx]?.rounds && circuitIdx >= workout.circuits.length - 1) ? (workout.abs ? "Move to Abs" : "Start Cool-Down")
     : (phase === "abs" && roundNum >= workout.abs.rounds) ? "Start Cool-Down"
     : `Complete Round ${roundNum}`;
 
