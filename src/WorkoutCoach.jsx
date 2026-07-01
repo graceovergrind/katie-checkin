@@ -5,6 +5,13 @@ function getExerciseKey(dayKey, exerciseName) {
   return `${dayKey}::${exerciseName.toLowerCase().replace(/\s+/g, "-")}`;
 }
 
+// Resolve the weight-log key for an exercise. An exercise may set an explicit
+// `logKey` to share history with the same movement on another day (e.g. a second
+// legs day reusing the original Leg Day's goblet squat / RDL / hip thrust logs).
+function getExerciseLogKey(dayKey, exercise) {
+  return exercise.logKey || getExerciseKey(dayKey, exercise.name);
+}
+
 // Parse seconds from reps like "30 sec", "30-45 sec", "20-30 sec each side"
 function parseTimedSeconds(reps) {
   const match = reps.match(/(\d+)(?:-(\d+))?\s*sec/i);
@@ -187,6 +194,39 @@ const WORKOUTS = {
         { name: "Seated Hamstring Stretch", reps: "30 sec each side", coaching: "One leg extended, reach toward your toes. Don\u2019t round your back \u2014 hinge forward.", trackWeight: false },
         { name: "Supine Spinal Twist", reps: "30 sec each side", coaching: "Lying on your back, drop your knees to one side. Let gravity do the work. Breathe.", trackWeight: false },
         { name: "Deep Breathing", reps: "5 slow breaths", coaching: "4 counts in, 6 counts out. Leg day complete.", trackWeight: false }
+      ]
+    }
+  },
+  legs2: {
+    name: "Leg Day II", emoji: "🦵", color: "#EC4899",
+    warmup: {
+      title: "Warm-Up", duration: "5 min",
+      exercises: [
+        { name: "Leg Swings", reps: "10 each leg", coaching: "Hold something for balance. Do 10 front-to-back, then 10 side-to-side, each leg. Loosens the hips before you load them.", trackWeight: false },
+        { name: "Bodyweight Squats", reps: "15 slow reps", coaching: "Slow and controlled — no bouncing. Push your knees out over your toes and get warm through the full range.", trackWeight: false },
+        { name: "Glute Bridges", reps: "15 reps", coaching: "On your back, drive through your heels and squeeze the glutes at the top. Wake them up so they fire in the working sets.", trackWeight: false },
+        { name: "World's Greatest Stretch", reps: "5 each side", coaching: "Lunge, hand to the floor, rotate the top arm to the ceiling. Opens the hips, hamstrings, and thoracic spine all at once.", trackWeight: false }
+      ]
+    },
+    circuits: [
+      {
+        name: "Working Sets — Lower Body", mode: "sets", rest: 60,
+        exercises: [
+          { name: "Goblet Squat", logKey: "legs::goblet-squats", sets: 3, reps: "10-12 reps", coaching: "Hold one dumbbell at your chest. Sit down between your hips and drive through the mid-foot. Only go as deep as the knees feel comfortable.", trackWeight: true, unit: "lbs" },
+          { name: "Romanian Deadlift", logKey: "legs::romanian-deadlifts", sets: 3, reps: "10 reps", coaching: "Dumbbells in front of your thighs, soft knees. Push your hips back and feel the hamstring stretch — don't round the low back. Keep the weights close to your legs.", trackWeight: true, unit: "lbs each" },
+          { name: "Hip Thrust", logKey: "legs::dumbbell-hip-thrusts", sets: 3, reps: "12 reps", coaching: "Shoulders on the bench, dumbbell across your hips (pad it with a towel). Pause and squeeze hard at the top. Your star movement — load it heavy over time.", trackWeight: true, unit: "lbs" },
+          { name: "Reverse Lunges", sets: 3, reps: "8 each side", coaching: "Step back and drop the back knee toward the floor, then drive through the front heel to stand. Keep the range comfortable for the knee. A dumbbell in each hand adds load when you're ready.", trackWeight: true, unit: "lbs each" },
+          { name: "Calf Raises", sets: 2, reps: "15-20 reps", coaching: "Bodyweight or holding a dumbbell. Full range — all the way up onto the toes, all the way down — and control it. No bouncing.", trackWeight: true, unit: "lbs" }
+        ]
+      }
+    ],
+    cooldown: {
+      title: "Cool-Down", duration: "5 min",
+      exercises: [
+        { name: "Standing Quad Stretch", reps: "30 sec each side", coaching: "Hold your ankle behind you, knees together, push your hip forward. Hold something for balance.", trackWeight: false },
+        { name: "Hamstring Stretch", reps: "30 sec each side", coaching: "Seated or standing — reach toward your toes. Hinge at the hips and don't round your back.", trackWeight: false },
+        { name: "Figure-4 Glute Stretch", reps: "30 sec each side", coaching: "Focus on the LEFT SIDE. Ankle on the opposite knee, pull the bottom leg toward you.", trackWeight: false },
+        { name: "Couch Stretch", reps: "30 sec each side", coaching: "Back knee down, shin up against a wall or couch (or just a kneeling hip flexor stretch). Push your hips forward gently — tight hip flexors feed your glute issues.", trackWeight: false }
       ]
     }
   },
@@ -449,7 +489,7 @@ const ExerciseCard = ({ exercise, dayKey, isActive, accentColor, log, onLog, cus
   const [showCoaching, setShowCoaching] = useState(false);
   const [showWeight, setShowWeight] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
-  const exKey = getExerciseKey(dayKey, exercise.name);
+  const exKey = getExerciseLogKey(dayKey, exercise);
   const history = log[exKey] || [];
   const rec = getRecommendation(history);
   const lastWeight = getLastWeight(history);
@@ -1187,11 +1227,11 @@ export default function WorkoutCoach({ onBack }) {
               {Object.entries(WORKOUTS).map(([key, w]) => {
                 const dayExercises = [...w.circuits.flatMap(c => c.exercises), ...(w.abs?.exercises || [])].filter(e => e.trackWeight);
                 const loggedCount = dayExercises.filter(e => {
-                  const k = getExerciseKey(key, e.name);
+                  const k = getExerciseLogKey(key, e);
                   return log[k] && log[k].length > 0;
                 }).length;
                 const hasRecs = dayExercises.some(e => {
-                  const k = getExerciseKey(key, e.name);
+                  const k = getExerciseLogKey(key, e);
                   const r = getRecommendation(log[k] || []);
                   return r && r.type === "increase";
                 });
@@ -1362,7 +1402,7 @@ export default function WorkoutCoach({ onBack }) {
       {!resting && (
         <div style={{ padding: "0 20px" }}>
           {exercises.map((ex, i) => {
-            const exKey = getExerciseKey(selectedDay, ex.name);
+            const exKey = getExerciseLogKey(selectedDay, ex);
             return (
               <ExerciseCard
                 key={`${phase}-${circuitIdx}-${exerciseIdx}-${roundNum}-${i}`}
